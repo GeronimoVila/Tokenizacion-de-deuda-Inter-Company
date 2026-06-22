@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: intercompany_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin_holding
+      POSTGRES_PASSWORD: secretpassword123
+      POSTGRES_DB: deuda_intercompany
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+    name: intercompany_pgdata

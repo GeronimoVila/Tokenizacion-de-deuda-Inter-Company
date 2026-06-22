@@ -1,0 +1,149 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Grupos_empresariales {
+  id             Int        @id @default(autoincrement())
+  nombre         String     @db.VarChar
+  cuit           String     @db.VarChar
+  fecha_creacion DateTime   @default(now()) @db.Timestamp()
+  
+  empresas       Empresas[]
+}
+
+model Empresas {
+  id               Int                   @id @default(autoincrement())
+  grupo_id         Int
+  nombre           String                @db.VarChar
+  cuit             String                @db.VarChar
+  wallet_address   String                @db.VarChar
+  
+  grupo            Grupos_empresariales  @relation(fields: [grupo_id], references: [id])
+  usuarios         User[]
+  deudas_emitidas  Transacciones_deuda[] @relation("EmpresaEmisora")
+  deudas_recibidas Transacciones_deuda[] @relation("EmpresaReceptora")
+}
+
+model Roles {
+  id       Int    @id @default(autoincrement())
+  nombre   String @db.VarChar
+  
+  usuarios User[]
+}
+
+// --- MODELO FUSIONADO (Tu tabla Usuarios + NextAuth) ---
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String?   // Google Name (Reemplaza a tu 'nombre')
+  email         String?   @unique // Google Email (Reemplaza a tu 'mail')
+  emailVerified DateTime? // Requisito de NextAuth
+  image         String?   // Foto de perfil de Google
+  
+  // Tus campos de negocio (ahora opcionales para permitir el primer login)
+  empresa_id    Int?
+  rol_id        Int?
+
+  empresa       Empresas? @relation(fields: [empresa_id], references: [id])
+  rol           Roles?    @relation(fields: [rol_id], references: [id])
+  
+  // Relaciones con Seguridad y Finanzas
+  accounts      Account[]
+  sessions      Session[]
+  compensaciones_ejecutadas Compensaciones[]
+
+  @@map("usuarios") // Mantiene el nombre real de la tabla en PostgreSQL
+}
+
+model Transacciones_deuda {
+  id                     Int       @id @default(autoincrement())
+  empresa_emisora_id     Int
+  empresa_receptora_id   Int
+  monto                  Decimal   @db.Decimal
+  detalle                String    @db.Text
+  url_documento_respaldo String    @db.VarChar
+  estado_validacion      String    @db.VarChar
+  fecha_creacion         DateTime  @default(now()) @db.Timestamp()
+  fecha_validacion       DateTime? @db.Timestamp()
+
+  empresa_emisora        Empresas  @relation("EmpresaEmisora", fields: [empresa_emisora_id], references: [id])
+  empresa_receptora      Empresas  @relation("EmpresaReceptora", fields: [empresa_receptora_id], references: [id])
+  
+  tokens_deuda           Tokens_deuda[]
+}
+
+model Tokens_deuda {
+  id                  Int       @id @default(autoincrement())
+  transaccion_id      Int
+  token_id_blockchain String    @db.VarChar
+  monto_actual        Decimal   @db.Decimal
+  estado_token        String    @db.VarChar
+  txhash_mint         String    @db.VarChar
+  txhash_burn         String?   @db.VarChar
+  block_number        Int
+
+  transaccion         Transacciones_deuda @relation(fields: [transaccion_id], references: [id])
+  compensaciones      Compensacion_Detalle[]
+}
+
+model Compensaciones {
+  id                  Int      @id @default(autoincrement())
+  fecha               DateTime @default(now()) @db.Timestamp()
+  usuario_ejecutor_id Int
+  descripcion         String   @db.Text
+
+  usuario_ejecutor    User                   @relation(fields: [usuario_ejecutor_id], references: [id])
+  detalles            Compensacion_Detalle[]
+}
+
+model Compensacion_Detalle {
+  id               Int      @id @default(autoincrement())
+  compensacion_id  Int
+  token_id         Int
+  monto_compensado Decimal  @db.Decimal
+
+  compensacion     Compensaciones @relation(fields: [compensacion_id], references: [id])
+  token            Tokens_deuda   @relation(fields: [token_id], references: [id])
+}
+
+// --- MODELOS ESTRICTOS DE NEXTAUTH ---
+model Account {
+  id                 String  @id @default(cuid())
+  userId             Int     // Adaptado a Int para coincidir con tu User.id
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int      // Adaptado a Int
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
