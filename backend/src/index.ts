@@ -1,14 +1,14 @@
-import 'dotenv/config'; // ¡Clave! Hace que Node.js lea tu archivo .env automáticamente
+import 'dotenv/config'; 
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { probarConexionBFA } from './services/blockchain.js';
 
 const app = express();
 const PORT = 4000;
 
-// --- CONFIGURACIÓN DE PRISMA 7.8.0 ---
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
@@ -20,20 +20,14 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// --- MIDDLEWARES ---
-// Permitimos que tu Frontend (puerto 3000) le hable a este Backend (puerto 4000)
 app.use(cors({ origin: 'http://localhost:3000' }));
-// Permitimos que el backend entienda el formato JSON
 app.use(express.json());
 
-// --- RUTAS (ENDPOINTS) ---
 
-// Ruta de prueba para saber si el backend está vivo
 app.get('/', (req, res) => {
   res.send('API del Holding Financiero funcionando perfectamente 🚀');
 });
 
-// Ruta de sincronización de seguridad (NextAuth -> Backend -> Prisma)
 app.post('/api/auth/sync', async (req, res) => {
   const { email, name, image } = req.body;
 
@@ -52,7 +46,6 @@ app.post('/api/auth/sync', async (req, res) => {
           email: email,
           name: name || "Usuario Google",
           image: image,
-          // rol_id y empresa_id quedan nulos para que un Admin los asigne luego
         },
       });
       console.log(`[Seguridad] Nuevo usuario registrado: ${email}`);
@@ -67,9 +60,10 @@ app.post('/api/auth/sync', async (req, res) => {
   }
 });
 
-// --- INICIO DEL SERVIDOR ---
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`=========================================`);
   console.log(`🚀 Servidor Backend corriendo en el puerto ${PORT}`);
   console.log(`=========================================`);
+  
+  await probarConexionBFA();
 });
