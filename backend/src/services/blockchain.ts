@@ -1,39 +1,35 @@
 import { ethers } from 'ethers';
 import 'dotenv/config';
 
-const rpcUrl = process.env.BFA_TESTNET_RPC;
+const rpcUrl = process.env.BFA_TESTNET_RPC || process.env.WEB3_RPC_URL;
 const privateKey = process.env.PRIVATE_KEY;
+const contractAddress = process.env.CONTRACT_ADDRESS;
 
-if (!rpcUrl || !privateKey) {
-  console.error("🚨 ERROR: Faltan variables BFA_TESTNET_RPC o PRIVATE_KEY en el .env");
+if (!rpcUrl || !privateKey || !contractAddress) {
+  console.error("🚨 ERROR: Faltan variables WEB3_RPC_URL, PRIVATE_KEY o CONTRACT_ADDRESS en el .env");
   process.exit(1);
 }
 
-// 1. Conexión a la red (El tubo)
 export const bfaProvider = new ethers.JsonRpcProvider(rpcUrl);
 
-// 2. Tu Billetera Maestra (Las llaves para firmar)
 export const adminWallet = new ethers.Wallet(privateKey, bfaProvider);
+
+const ABI = [
+  "function emitirDeuda(address cuentaDestino, uint256 cantidad, string empresaOrigenNombre, string usuarioOperadorId, string comprobanteId) public",
+  "function decimals() public view returns (uint8)"
+];
+
+export const holdingContract = new ethers.Contract(contractAddress, ABI, adminWallet);
 
 export const probarConexionBFA = async () => {
   try {
-    console.log("⏳ [Web3] Conectando al nodo y leyendo billetera...");
-    
+    console.log("⏳ [Web3] Conectando a la Blockchain...");
     const bloqueActual = await bfaProvider.getBlockNumber();
-    
-    // Consultamos cuánta plata tiene nuestra billetera
     const saldoWei = await bfaProvider.getBalance(adminWallet.address);
-    // Convertimos los ceros gigantes de la blockchain a un formato legible (ETH)
-    const saldoEth = ethers.formatEther(saldoWei);
     
-    console.log(`✅ [Web3] ¡Conexión exitosa a la Testnet (Bloque: ${bloqueActual})!`);
-    console.log(`👛 [Web3] Billetera Admin: ${adminWallet.address}`);
-    console.log(`💰 [Web3] Saldo disponible para Gas: ${saldoEth} ETH`);
-    
-    if (parseFloat(saldoEth) === 0) {
-      console.warn("⚠️ ALERTA: Tu saldo es 0. Necesitás pedir fondos en un Faucet de Sepolia.");
-    }
-    
+    console.log(`✅ [Web3] Conectado (Bloque: ${bloqueActual})`);
+    console.log(`💰 [Web3] Saldo disponible Gas: ${ethers.formatEther(saldoWei)} ETH`);
+    console.log(`📜 [Web3] Contrato enlazado en: ${contractAddress}`);
     return true;
   } catch (error) {
     console.error(`❌ [Web3] Error de conexión:`, error);
