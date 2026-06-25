@@ -16,6 +16,7 @@ model Grupos_empresariales {
   fecha_creacion DateTime   @default(now()) @db.Timestamp()
   
   empresas       Empresas[]
+  usuarios       User[]
 }
 
 model Empresas {
@@ -38,27 +39,26 @@ model Roles {
   usuarios User[]
 }
 
-// --- MODELO FUSIONADO (Tu tabla Usuarios + NextAuth) ---
 model User {
   id            Int       @id @default(autoincrement())
-  name          String?   // Google Name (Reemplaza a tu 'nombre')
-  email         String?   @unique // Google Email (Reemplaza a tu 'mail')
-  emailVerified DateTime? // Requisito de NextAuth
-  image         String?   // Foto de perfil de Google
+  name          String?   
+  email         String?   @unique 
+  emailVerified DateTime? 
+  image         String?   
   
-  // Tus campos de negocio (ahora opcionales para permitir el primer login)
-  empresa_id    Int?
-  rol_id        Int?
+  grupo_id      Int?
+  empresa_id    Int?      
+  rol_id        Int?      
 
-  empresa       Empresas? @relation(fields: [empresa_id], references: [id])
-  rol           Roles?    @relation(fields: [rol_id], references: [id])
+  grupo         Grupos_empresariales? @relation(fields: [grupo_id], references: [id])
+  empresa       Empresas?             @relation(fields: [empresa_id], references: [id])
+  rol           Roles?                @relation(fields: [rol_id], references: [id])
   
-  // Relaciones con Seguridad y Finanzas
   accounts      Account[]
   sessions      Session[]
   compensaciones_ejecutadas Compensaciones[]
 
-  @@map("usuarios") // Mantiene el nombre real de la tabla en PostgreSQL
+  @@map("usuarios") 
 }
 
 model Transacciones_deuda {

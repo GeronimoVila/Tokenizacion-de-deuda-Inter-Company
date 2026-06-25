@@ -1,28 +1,17 @@
 import 'dotenv/config'; 
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { probarConexionBFA } from './services/blockchain.js';
+import deudasRoutes from './routes/deudas.routes.js';
+import { prisma } from './config/prisma.js';
 
 const app = express();
 const PORT = 4000;
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  console.error("🚨 ERROR FATAL: No se encontró DATABASE_URL en el archivo .env del backend");
-  process.exit(1);
-}
-
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 
+app.use('/api/deudas', deudasRoutes);
 
 app.get('/', (req, res) => {
   res.send('API del Holding Financiero funcionando perfectamente 🚀');
@@ -41,19 +30,23 @@ app.post('/api/auth/sync', async (req, res) => {
     });
 
     if (!dbUser) {
-      dbUser = await prisma.user.create({
-        data: {
-          email: email,
-          name: name || "Usuario Google",
-          image: image,
-        },
+      console.warn(`🚨 [Seguridad] Intento de login bloqueado. Email no invitado: ${email}`);
+      return res.status(403).json({ 
+        error: "Acceso denegado. Tu email no ha sido invitado al Holding." 
       });
-      console.log(`[Seguridad] Nuevo usuario registrado: ${email}`);
-    } else {
-      console.log(`[Seguridad] Usuario logueado exitosamente: ${email}`);
     }
 
+    dbUser = await prisma.user.update({
+      where: { email: email },
+      data: {
+        name: name || dbUser.name,
+        image: image || dbUser.image,
+      },
+    });
+
+    console.log(`✅ [Seguridad] Usuario verificado y sincronizado: ${email} (Rol: ${dbUser.rol_id})`);
     res.status(200).json({ success: true, user: dbUser });
+
   } catch (error) {
     console.error("[Seguridad] Error en /api/auth/sync:", error);
     res.status(500).json({ error: "Error interno del servidor" });
