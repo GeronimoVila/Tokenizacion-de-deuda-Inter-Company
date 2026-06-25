@@ -4,6 +4,7 @@ import cors from 'cors';
 import { probarConexionBFA } from './services/blockchain.js';
 import deudasRoutes from './routes/deudas.routes.js';
 import { prisma } from './config/prisma.js';
+import nettingRoutes from './routes/netting.routes.js';
 
 const app = express();
 const PORT = 4000;
@@ -12,6 +13,7 @@ app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 
 app.use('/api/deudas', deudasRoutes);
+app.use('/api/netting', nettingRoutes);
 
 app.get('/', (req, res) => {
   res.send('API del Holding Financiero funcionando perfectamente 🚀');

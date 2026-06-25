@@ -56,7 +56,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
     const id = req.params.id as string;
     const usuario = req.usuario;
 
-    // 1. BUSCAMOS LA DEUDA ORIGINAL
     const deuda = await prisma.transacciones_deuda.findUnique({
       where: { id: parseInt(id) },
       include: { empresa_emisora: true, empresa_receptora: true }
@@ -64,45 +63,35 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
 
     if (!deuda) return res.status(404).json({ error: "Deuda no encontrada." });
 
-    // 2. VALIDACIONES DE NEGOCIO Y SEGURIDAD
     if (deuda.estado_validacion !== 'Pendiente de Validación') {
       return res.status(400).json({ error: "Esta deuda ya fue procesada o rechazada." });
     }
     
-    // Regla B2B Core: Solo la empresa a la que le están cobrando (Emisora) puede aprobar la deuda.
     if (deuda.empresa_emisora_id !== usuario.empresa_id) {
       return res.status(403).json({ error: "No tenés permisos para aprobar facturas a nombre de otra empresa." });
     }
 
-    // Asegurarnos que la contraparte tiene una Billetera (Wallet) configurada para recibir los tokens
     if (!deuda.empresa_receptora.wallet_address) {
       return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada para recibir los tokens." });
     }
 
     console.log(`🚀 [Web3] Iniciando acuñación de deuda #${deuda.id} hacia BFA...`);
 
-    // 3. ADAPTAR MONTOS A LA BLOCKCHAIN
-    // Convertimos el monto de Prisma (Decimal) a string, y luego le decimos a ethers que lo formatee con los 2 decimales que configuramos en Solidity.
     const montoString = deuda.monto.toString();
     const montoParaBlockchain = ethers.parseUnits(montoString, 2);
 
-    // 4. INTERACCIÓN CON EL SMART CONTRACT (La magia ocurre acá)
     const tx = await holdingContract.emitirDeuda(
-      deuda.empresa_receptora.wallet_address, // cuentaDestino
-      montoParaBlockchain,                    // cantidad en centavos
-      deuda.empresa_emisora.nombre,           // empresaOrigenNombre
-      usuario.email,                          // usuarioOperadorId (Auditoría)
-      `ID-Transaccion-${deuda.id}`            // comprobanteId
+      deuda.empresa_receptora.wallet_address,
+      montoParaBlockchain,
+      deuda.empresa_emisora.nombre,
+      usuario.email,
+      `ID-Transaccion-${deuda.id}`
     );
 
-    // Ponemos en pausa nuestro Backend hasta que los mineros del mundo confirmen el bloque
     console.log(`⏳ [Web3] Transacción enviada. Esperando minado... TxHash: ${tx.hash}`);
     const receipt = await tx.wait();
 
-    // 5. TRANSACCIÓN EN BASE DE DATOS LOCAL (Atómico)
-    // Llegamos acá solo si la blockchain aprobó todo sin errores.
     const resultadoDB = await prisma.$transaction(async (txPrisma) => {
-      // A) Marcamos la deuda como Emitida
       const deudaActualizada = await txPrisma.transacciones_deuda.update({
         where: { id: deuda.id },
         data: { 
@@ -111,11 +100,10 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
         }
       });
 
-      // B) Registramos el Token Físico en nuestra tabla
       const nuevoToken = await txPrisma.tokens_deuda.create({
         data: {
           transaccion_id: deuda.id,
-          token_id_blockchain: tx.hash,   // Usamos el hash como identificador único
+          token_id_blockchain: tx.hash,
           monto_actual: deuda.monto,
           estado_token: 'Activo',
           txhash_mint: tx.hash,
@@ -136,10 +124,67 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
 
   } catch (error: any) {
     console.error("🚨 [Aprobación Controller] Error:", error);
-    // Si ethers.js tira error por falta de gas o caída de red, la base de datos local nunca se tocó.
     res.status(500).json({ 
       error: "Error procesando la aprobación Web3.", 
       detalle: error.message 
     });
+  }
+};
+
+export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
+  try {
+    const usuario = req.usuario;
+
+    if (!usuario?.empresa_id) {
+      return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa." });
+    }
+
+    const empresaId = usuario.empresa_id;
+
+    const cobrosEmitidos = await prisma.transacciones_deuda.findMany({
+      where: { empresa_receptora_id: empresaId, estado_validacion: 'Emitida' },
+      include: { empresa_emisora: true }
+    });
+
+    const pagosEmitidos = await prisma.transacciones_deuda.findMany({
+      where: { empresa_emisora_id: empresaId, estado_validacion: 'Emitida' },
+      include: { empresa_receptora: true }
+    });
+
+    const pendientes = await prisma.transacciones_deuda.findMany({
+      where: {
+        OR: [
+          { empresa_emisora_id: empresaId },
+          { empresa_receptora_id: empresaId }
+        ],
+        estado_validacion: 'Pendiente de Validación'
+      },
+      include: { empresa_emisora: true, empresa_receptora: true }
+    });
+
+    const totalTokensAFavor = cobrosEmitidos.reduce((acc, curr) => acc + parseFloat(curr.monto.toString()), 0);
+    const totalDeudasAPagar = pagosEmitidos.reduce((acc, curr) => acc + parseFloat(curr.monto.toString()), 0);
+    const saldoNeto = totalTokensAFavor - totalDeudasAPagar;
+
+    res.status(200).json({
+      success: true,
+      message: "Dashboard financiero calculado con éxito.",
+      data: {
+        balances: {
+          total_tokens_a_favor: totalTokensAFavor,
+          total_deudas_a_pagar: totalDeudasAPagar,
+          saldo_neto_empresa: saldoNeto
+        },
+        listados: {
+          mis_tokens_por_cobrar: cobrosEmitidos,
+          mis_deudas_por_pagar: pagosEmitidos,
+          tramites_pendientes: pendientes
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("🚨 [Deudas Controller] Error al obtener dashboard:", error);
+    res.status(500).json({ error: "Error interno obteniendo los datos de la empresa." });
   }
 };

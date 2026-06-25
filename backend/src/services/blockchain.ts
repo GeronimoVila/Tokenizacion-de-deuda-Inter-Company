@@ -16,6 +16,7 @@ export const adminWallet = new ethers.Wallet(privateKey, bfaProvider);
 
 const ABI = [
   "function emitirDeuda(address cuentaDestino, uint256 cantidad, string empresaOrigenNombre, string usuarioOperadorId, string comprobanteId) public",
+  "function compensarDeuda(address cuentaOrigen, uint256 cantidad, string administradorId, string idCompensacionMensual) public",
   "function decimals() public view returns (uint8)"
 ];
 
