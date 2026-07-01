@@ -1,7 +1,7 @@
-import NextAuth from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -10,41 +10,52 @@ const handler = NextAuth({
   ],
   secret: process.env.NEXTAUTH_SECRET,
   session: {
-    strategy: "jwt", // Clave: Usamos tokens en vez de base de datos directa
+    strategy: "jwt",
   },
   callbacks: {
-    // Interceptamos el momento exacto donde Google nos aprueba el login
+    // 1. Interceptamos el momento exacto donde Google nos aprueba el login
     async signIn({ user }) {
       if (!user.email) return false;
 
       try {
-        // Le avisamos a TU Backend Node.js que alguien entró (Ajustá el puerto 4000 si usás otro)
-        const response = await fetch("http://localhost:4000/api/auth/sync", {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+        
+        const response = await fetch(`${apiUrl}/auth/sync`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            email: user.email,
-            name: user.name,
-            image: user.image,
-          }),
+          body: JSON.stringify({ email: user.email }),
         });
 
         if (response.ok) {
-          return true; // El backend lo guardó ok, lo dejamos entrar a la app
+          return true;
         } else {
-          console.error("El backend rechazó el guardado del usuario");
-          return false; 
+          console.warn(`🚨 Login bloqueado: ${user.email} no fue autorizado por la administración.`);
+          return false; // Rechazamos el acceso
         }
       } catch (error) {
-        console.error("Error comunicándose con el Backend:", error);
-        // Para que no te bloquees en desarrollo, devolvemos true, 
-        // pero en producción acá deberíamos devolver false si el backend está caído.
-        return true; 
+        console.error("🚨 Error crítico comunicándose con el Backend:", error);
+        return false; 
       }
     },
+    
+    async jwt({ token, user }) {
+      if (user?.email) {
+        token.email = user.email;
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      if (session.user && token.email) {
+        session.user.email = token.email as string;
+      }
+      return session;
+    }
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
