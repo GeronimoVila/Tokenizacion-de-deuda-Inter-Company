@@ -9,47 +9,46 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "jwt" },
   callbacks: {
-    // 1. Interceptamos el momento exacto donde Google nos aprueba el login
     async signIn({ user }) {
-      if (!user.email) return false;
-
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-        
-        const response = await fetch(`${apiUrl}/auth/sync`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: user.email }),
-        });
-
-        if (response.ok) {
-          return true;
-        } else {
-          console.warn(`🚨 Login bloqueado: ${user.email} no fue autorizado por la administración.`);
-          return false; // Rechazamos el acceso
-        }
-      } catch (error) {
-        console.error("🚨 Error crítico comunicándose con el Backend:", error);
-        return false; 
-      }
+      return !!user.email;
     },
     
-    async jwt({ token, user }) {
-      if (user?.email) {
-        token.email = user.email;
+    async jwt({ token, user, account }) {
+      if (account && user?.email) {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+          const response = await fetch(`${apiUrl}/auth/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: user.email }),
+          });
+
+          if (response.ok) {
+            const body = await response.json();
+            
+            if (body.success && body.data) {
+              token.rol_id = body.data.rol_id;
+              token.empresa_id = body.data.empresa_id;
+              token.grupo_id = body.data.grupo_id;
+              console.log("✅ Datos del backend inyectados en JWT:", body.data.rol_id);
+            }
+          } else {
+            console.warn("🚨 Usuario no encontrado o no sincronizado en el backend.");
+          }
+        } catch (error) {
+          console.error("🚨 Error comunicándose con el Backend desde NextAuth:", error);
+        }
       }
       return token;
     },
 
     async session({ session, token }) {
-      if (session.user && token.email) {
-        session.user.email = token.email as string;
+      if (session.user) {
+        session.user.rol_id = token.rol_id;
+        session.user.empresa_id = token.empresa_id;
+        session.user.grupo_id = token.grupo_id;
       }
       return session;
     }
@@ -57,5 +56,4 @@ export const authOptions: NextAuthOptions = {
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };

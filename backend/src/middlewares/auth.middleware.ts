@@ -4,7 +4,9 @@ import { prisma } from '../config/prisma.js';
 export const ROLES = {
   SYSADMIN: 1,
   ADMIN_HOLDING: 2,
-  OPERADOR: 3,
+  ADMIN_SUBSIDIARIA: 3,
+  OPERADOR: 4,
+  AUDITOR: 5,
 };
 
 export interface AuthRequest extends Request {
