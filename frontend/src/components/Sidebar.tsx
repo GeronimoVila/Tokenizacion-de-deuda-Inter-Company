@@ -28,13 +28,13 @@ export default function Sidebar() {
         )}
 
         {[1, 2, 3].includes(rolId!) && (
-          <Link href="/dashboard/aprobaciones" className="block px-4 py-2 rounded hover:bg-gray-800 transition">
+          <Link href="/aprobaciones" className="block px-4 py-2 rounded hover:bg-gray-800 transition">
             Aprobar Emisiones
           </Link>
         )}
 
         {[1, 2, 3, 4].includes(rolId!) && (
-          <Link href="/dashboard/cargar-deuda" className="block px-4 py-2 rounded hover:bg-gray-800 transition">
+          <Link href="/cargar-deuda" className="block px-4 py-2 rounded hover:bg-gray-800 transition">
             Cargar Deuda
           </Link>
         )}

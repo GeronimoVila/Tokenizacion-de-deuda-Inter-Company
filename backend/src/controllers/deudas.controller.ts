@@ -1,4 +1,6 @@
 import { Response } from 'express';
+import axios from 'axios';
+import FormData from 'form-data';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { ethers } from 'ethers';
@@ -6,44 +8,61 @@ import { holdingContract } from '../services/blockchain.js';
 
 export const registrarDeuda = async (req: AuthRequest, res: Response) => {
   try {
-    const { empresa_contraparte_id, monto, detalle, url_documento_respaldo } = req.body;
+    const { empresa_contraparte_id, monto, detalle } = req.body;
+    const archivo = req.file;
     const usuario = req.usuario;
 
     if (!usuario?.empresa_id || !usuario?.grupo_id) {
-      return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa del Holding." });
+      return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa." });
     }
 
-    if (!monto || monto <= 0) {
-      return res.status(400).json({ error: "El monto debe ser mayor a 0." });
-    }
-    if (usuario.empresa_id === empresa_contraparte_id) {
-      return res.status(400).json({ error: "Operación inválida: Una empresa no puede registrar deuda consigo misma." });
+    if (!archivo) {
+      return res.status(400).json({ error: "El comprobante PDF es obligatorio." });
     }
 
-    const contraparte = await prisma.empresas.findUnique({
-      where: { id: empresa_contraparte_id }
+    const contraparteIdNum = parseInt(empresa_contraparte_id);
+    const montoNum = parseFloat(monto);
+
+    if (!montoNum || montoNum <= 0) return res.status(400).json({ error: "El monto debe ser mayor a 0." });
+    if (usuario.empresa_id === contraparteIdNum) return res.status(400).json({ error: "No puedes registrar deuda contigo mismo." });
+
+    const contraparte = await prisma.empresas.findUnique({ where: { id: contraparteIdNum } });
+    if (!contraparte || contraparte.grupo_id !== usuario.grupo_id) {
+      return res.status(403).json({ error: "La empresa destino no existe en tu Holding." });
+    }
+
+    // --- MAGIA WEB3: SUBIDA A IPFS (PINATA) ---
+    const formData = new FormData();
+    // Le pasamos el buffer de memoria que nos dejó Multer
+    formData.append('file', archivo.buffer, {
+      filename: archivo.originalname,
+      contentType: archivo.mimetype,
     });
 
-    if (!contraparte || contraparte.grupo_id !== usuario.grupo_id) {
-      return res.status(403).json({ error: "La empresa destino no existe o no pertenece a tu Holding." });
-    }
+    const pinataResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
+      headers: {
+        'Authorization': `Bearer ${process.env.PINATA_JWT}`,
+        ...formData.getHeaders()
+      }
+    });
 
+    const ipfsHash = pinataResponse.data.IpfsHash;
+    // Guardamos el enlace inmutable de IPFS en la base de datos
+    const url_documento = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+
+    // --- GUARDADO EN BASE DE DATOS ---
     const nuevaDeuda = await prisma.transacciones_deuda.create({
       data: {
-        empresa_emisora_id: empresa_contraparte_id,
+        empresa_emisora_id: contraparteIdNum,
         empresa_receptora_id: usuario.empresa_id,
-        monto: monto,
+        monto: montoNum,
         detalle: detalle,
-        url_documento_respaldo: url_documento_respaldo,
+        url_documento_respaldo: url_documento, // <-- Acá va el enlace a IPFS
         estado_validacion: 'Pendiente de Validación'
       }
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Factura registrada. Pendiente de aprobación por la contraparte.",
-      data: nuevaDeuda
-    });
+    res.status(201).json({ success: true, message: "Deuda e IPFS registrados.", data: nuevaDeuda });
 
   } catch (error) {
     console.error("🚨 [Deudas Controller] Error al registrar:", error);
