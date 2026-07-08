@@ -30,7 +30,6 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
       return res.status(403).json({ error: "Usuario sin rol o empresa asignada." });
     }
 
-    console.log(`✅ Ingreso autorizado: ${email} | Rol: ${dbUser.rol_id}`);
     return res.status(200).json({ success: true, data: dbUser });
 
   } catch (error) {

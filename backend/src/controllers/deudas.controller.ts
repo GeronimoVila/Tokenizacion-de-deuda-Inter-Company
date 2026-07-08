@@ -5,6 +5,7 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { ethers } from 'ethers';
 import { holdingContract } from '../services/blockchain.js';
+import { Prisma } from '@prisma/client';
 
 export const registrarDeuda = async (req: AuthRequest, res: Response) => {
   try {
@@ -21,9 +22,18 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
     }
 
     const contraparteIdNum = parseInt(empresa_contraparte_id);
-    const montoNum = parseFloat(monto);
 
-    if (!montoNum || montoNum <= 0) return res.status(400).json({ error: "El monto debe ser mayor a 0." });
+    let montoDecimal: Prisma.Decimal;
+    try {
+      montoDecimal = new Prisma.Decimal(monto);
+    } catch (error) {
+      return res.status(400).json({ error: "El formato del monto es inválido." });
+    }
+
+    if (montoDecimal.lte(0)) {
+      return res.status(400).json({ error: "El monto debe ser mayor a 0." });
+    }
+
     if (usuario.empresa_id === contraparteIdNum) return res.status(400).json({ error: "No puedes registrar deuda contigo mismo." });
 
     const contraparte = await prisma.empresas.findUnique({ where: { id: contraparteIdNum } });
@@ -31,9 +41,7 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "La empresa destino no existe en tu Holding." });
     }
 
-    // --- MAGIA WEB3: SUBIDA A IPFS (PINATA) ---
     const formData = new FormData();
-    // Le pasamos el buffer de memoria que nos dejó Multer
     formData.append('file', archivo.buffer, {
       filename: archivo.originalname,
       contentType: archivo.mimetype,
@@ -47,17 +55,15 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
     });
 
     const ipfsHash = pinataResponse.data.IpfsHash;
-    // Guardamos el enlace inmutable de IPFS en la base de datos
     const url_documento = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
 
-    // --- GUARDADO EN BASE DE DATOS ---
     const nuevaDeuda = await prisma.transacciones_deuda.create({
       data: {
         empresa_emisora_id: contraparteIdNum,
         empresa_receptora_id: usuario.empresa_id,
-        monto: montoNum,
+        monto: montoDecimal,
         detalle: detalle,
-        url_documento_respaldo: url_documento, // <-- Acá va el enlace a IPFS
+        url_documento_respaldo: url_documento,
         estado_validacion: 'Pendiente de Validación'
       }
     });
@@ -181,18 +187,24 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
       include: { empresa_emisora: true, empresa_receptora: true }
     });
 
-    const totalTokensAFavor = cobrosEmitidos.reduce((acc, curr) => acc + parseFloat(curr.monto.toString()), 0);
-    const totalDeudasAPagar = pagosEmitidos.reduce((acc, curr) => acc + parseFloat(curr.monto.toString()), 0);
-    const saldoNeto = totalTokensAFavor - totalDeudasAPagar;
+    const totalTokensAFavor = cobrosEmitidos.reduce(
+      (acc, curr) => acc.plus(new Prisma.Decimal(curr.monto.toString())), 
+      new Prisma.Decimal(0)
+    );
+    const totalDeudasAPagar = pagosEmitidos.reduce(
+      (acc, curr) => acc.plus(new Prisma.Decimal(curr.monto.toString())), 
+      new Prisma.Decimal(0)
+    );
+    const saldoNeto = totalTokensAFavor.minus(totalDeudasAPagar);
 
     res.status(200).json({
       success: true,
       message: "Dashboard financiero calculado con éxito.",
       data: {
         balances: {
-          total_tokens_a_favor: totalTokensAFavor,
-          total_deudas_a_pagar: totalDeudasAPagar,
-          saldo_neto_empresa: saldoNeto
+          total_tokens_a_favor: totalTokensAFavor.toNumber(),
+          total_deudas_a_pagar: totalDeudasAPagar.toNumber(),
+          saldo_neto_empresa: saldoNeto.toNumber()
         },
         listados: {
           mis_tokens_por_cobrar: cobrosEmitidos,
@@ -205,5 +217,44 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("🚨 [Deudas Controller] Error al obtener dashboard:", error);
     res.status(500).json({ error: "Error interno obteniendo los datos de la empresa." });
+  }
+};
+
+export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const usuario = req.usuario;
+
+    const deuda = await prisma.transacciones_deuda.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!deuda) return res.status(404).json({ error: "Deuda no encontrada." });
+
+    if (deuda.estado_validacion !== 'Pendiente de Validación') {
+      return res.status(400).json({ error: "Esta deuda ya fue procesada o rechazada previamente." });
+    }
+    
+    if (deuda.empresa_emisora_id !== usuario.empresa_id) {
+      return res.status(403).json({ error: "No tenés permisos para rechazar facturas a nombre de otra empresa." });
+    }
+
+    const deudaRechazada = await prisma.transacciones_deuda.update({
+      where: { id: deuda.id },
+      data: { 
+        estado_validacion: 'Rechazada',
+        fecha_validacion: new Date()
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "La operación de deuda ha sido rechazada exitosamente.",
+      data: deudaRechazada
+    });
+
+  } catch (error: any) {
+    console.error("🚨 [Deudas Controller] Error al rechazar:", error);
+    res.status(500).json({ error: "Error procesando el rechazo de la deuda." });
   }
 };

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 
-// Interfaz para el formulario
 interface DeudaFormData {
   empresaDeudoraId: number | "";
   monto: number | "";
@@ -11,7 +10,6 @@ interface DeudaFormData {
   comprobante: File | null;
 }
 
-// Interfaz para el listado de empresas que trae el backend
 interface EmpresaOption {
   id: number;
   nombre: string;
@@ -31,7 +29,6 @@ export default function CargarDeudaPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito"; texto: string } | null>(null);
 
-  // Hook para cargar las empresas dinámicamente cuando el usuario inicia sesión
   useEffect(() => {
     if (session?.user?.email) {
       cargarEmpresas();
@@ -144,7 +141,6 @@ export default function CargarDeudaPage() {
             className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="" disabled>Seleccione una empresa...</option>
-            {/* Renderizamos las empresas de forma dinámica */}
             {empresas.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.nombre} (ID: {emp.id})
