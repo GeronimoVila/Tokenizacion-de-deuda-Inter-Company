@@ -15,6 +15,7 @@ export const generarPropuestaNetting = async (grupoId: number) => {
   });
 
   const balances = new Map<string, Prisma.Decimal>();
+  const tokensMap = new Map<string, any[]>();
 
   tokensActivos.forEach(token => {
     const deudorId = token.transaccion.empresa_emisora_id;
@@ -23,6 +24,9 @@ export const generarPropuestaNetting = async (grupoId: number) => {
 
     const saldoActual = balances.get(llave) || new Prisma.Decimal(0);
     balances.set(llave, saldoActual.plus(token.monto_actual));
+    const arrayTokens = tokensMap.get(llave) || [];
+    arrayTokens.push(token);
+    tokensMap.set(llave, arrayTokens);
   });
 
   const propuestasCompensacion = [];
@@ -51,6 +55,8 @@ export const generarPropuestaNetting = async (grupoId: number) => {
         montoACompensar: montoCompensable,
         saldoNetoFinal_A_hacia_B: montoDeudorAAcreedor.minus(montoCompensable),
         saldoNetoFinal_B_hacia_A: montoAcreedorADeudor.minus(montoCompensable),
+        deudasA_B: tokensMap.get(llave) || [],
+        deudasB_A: tokensMap.get(llaveInversa) || []
       });
     }
 

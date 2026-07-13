@@ -4,8 +4,8 @@ import { requerirRol, ROLES } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.get('/simular', requerirRol([ROLES.ADMIN_HOLDING, ROLES.SYSADMIN]), simularNetting);
+router.get('/simular', requerirRol([ROLES.SYSADMIN, ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA]), simularNetting);
 
-router.post('/ejecutar', requerirRol([ROLES.ADMIN_HOLDING, ROLES.SYSADMIN]), ejecutarNetting);
+router.post('/ejecutar', requerirRol([ROLES.SYSADMIN, ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA]), ejecutarNetting);
 
 export default router;

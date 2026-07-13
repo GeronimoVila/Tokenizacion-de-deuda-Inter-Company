@@ -89,68 +89,141 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
     if (!deuda) return res.status(404).json({ error: "Deuda no encontrada." });
 
     if (deuda.estado_validacion !== 'Pendiente de Validación') {
-      return res.status(400).json({ error: "Esta deuda ya fue procesada o rechazada." });
+      return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada." });
     }
     
     if (deuda.empresa_emisora_id !== usuario.empresa_id) {
-      return res.status(403).json({ error: "No tenés permisos para aprobar facturas a nombre de otra empresa." });
+      return res.status(403).json({ error: "No tenés permisos para aprobar esta operación." });
     }
 
-    if (!deuda.empresa_receptora.wallet_address) {
-      return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada para recibir los tokens." });
+    const isLiquidacion = deuda.detalle.includes("Liquidación de Saldo");
+
+    if (isLiquidacion) {
+      console.log(`🚀 [Web3] Iniciando Quema por Liquidación Bancaria #${deuda.id}...`);
+
+      const deudorOriginalId = deuda.empresa_receptora_id; 
+      const acreedorOriginalId = deuda.empresa_emisora_id; 
+      const walletAcreedor = deuda.empresa_emisora.wallet_address;
+
+      if (!walletAcreedor) {
+        return res.status(400).json({ error: "No tienes una Wallet configurada para quemar los tokens." });
+      }
+
+      const montoString = deuda.monto.toString();
+      const montoParaBlockchain = ethers.parseUnits(montoString, 2);
+
+      const tx = await holdingContract.compensarDeuda(
+        walletAcreedor,
+        montoParaBlockchain,
+        usuario.email,
+        `LIQ-${deuda.id}`
+      );
+
+      console.log(`⏳ [Web3] Transacción de quema enviada. TxHash: ${tx.hash}`);
+      await tx.wait();
+
+      const resultadoDB = await prisma.$transaction(async (txPrisma) => {
+        const deudaActualizada = await txPrisma.transacciones_deuda.update({
+          where: { id: deuda.id },
+          data: { 
+            estado_validacion: 'Liquidada', 
+            fecha_validacion: new Date()
+          }
+        });
+
+        const tokensActivos = await txPrisma.tokens_deuda.findMany({
+          where: {
+            estado_token: 'Activo',
+            monto_actual: { gt: 0 },
+            transaccion: {
+              empresa_emisora_id: deudorOriginalId,
+              empresa_receptora_id: acreedorOriginalId
+            }
+          },
+          orderBy: { id: 'asc' }
+        });
+
+        let restante = new Prisma.Decimal(deuda.monto.toString());
+
+        for (const token of tokensActivos) {
+          if (restante.lte(0)) break;
+
+          const montoToken = new Prisma.Decimal(token.monto_actual.toString());
+          const aDescontar = Prisma.Decimal.min(montoToken, restante);
+          const nuevoMonto = montoToken.minus(aDescontar);
+          const nuevoEstado = nuevoMonto.equals(0) ? 'Quemado' : 'Activo';
+
+          await txPrisma.tokens_deuda.update({
+            where: { id: token.id },
+            data: {
+              monto_actual: nuevoMonto,
+              estado_token: nuevoEstado,
+              txhash_burn: tx.hash
+            }
+          });
+
+          restante = restante.minus(aDescontar);
+        }
+
+        return deudaActualizada;
+      });
+
+      console.log(`✅ [Web3 + DB] Tokens liquidados y Hash inmutable guardado.`);
+      return res.status(200).json({
+        success: true,
+        message: "Cobro verificado y tokens remanentes quemados en la BFA.",
+        data: resultadoDB
+      });
+
+    } else {
+      if (!deuda.empresa_receptora.wallet_address) {
+        return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada." });
+      }
+
+      const montoString = deuda.monto.toString();
+      const montoParaBlockchain = ethers.parseUnits(montoString, 2);
+
+      const tx = await holdingContract.emitirDeuda(
+        deuda.empresa_receptora.wallet_address,
+        montoParaBlockchain,
+        deuda.empresa_emisora.nombre,
+        usuario.email,
+        `ID-Transaccion-${deuda.id}`
+      );
+
+      const receipt = await tx.wait();
+
+      const resultadoDB = await prisma.$transaction(async (txPrisma) => {
+        const deudaActualizada = await txPrisma.transacciones_deuda.update({
+          where: { id: deuda.id },
+          data: { estado_validacion: 'Emitida', fecha_validacion: new Date() }
+        });
+
+        const nuevoToken = await txPrisma.tokens_deuda.create({
+          data: {
+            transaccion_id: deuda.id,
+            token_id_blockchain: tx.hash,
+            monto_actual: deuda.monto,
+            estado_token: 'Activo',
+            txhash_mint: tx.hash,
+            block_number: receipt.blockNumber
+          }
+        });
+
+        return { deudaActualizada, nuevoToken };
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Deuda aprobada y tokenizada exitosamente en la Blockchain.",
+        data: resultadoDB
+      });
     }
-
-    console.log(`🚀 [Web3] Iniciando acuñación de deuda #${deuda.id} hacia BFA...`);
-
-    const montoString = deuda.monto.toString();
-    const montoParaBlockchain = ethers.parseUnits(montoString, 2);
-
-    const tx = await holdingContract.emitirDeuda(
-      deuda.empresa_receptora.wallet_address,
-      montoParaBlockchain,
-      deuda.empresa_emisora.nombre,
-      usuario.email,
-      `ID-Transaccion-${deuda.id}`
-    );
-
-    console.log(`⏳ [Web3] Transacción enviada. Esperando minado... TxHash: ${tx.hash}`);
-    const receipt = await tx.wait();
-
-    const resultadoDB = await prisma.$transaction(async (txPrisma) => {
-      const deudaActualizada = await txPrisma.transacciones_deuda.update({
-        where: { id: deuda.id },
-        data: { 
-          estado_validacion: 'Emitida',
-          fecha_validacion: new Date()
-        }
-      });
-
-      const nuevoToken = await txPrisma.tokens_deuda.create({
-        data: {
-          transaccion_id: deuda.id,
-          token_id_blockchain: tx.hash,
-          monto_actual: deuda.monto,
-          estado_token: 'Activo',
-          txhash_mint: tx.hash,
-          block_number: receipt.blockNumber
-        }
-      });
-
-      return { deudaActualizada, nuevoToken };
-    });
-
-    console.log(`✅ [Web3 + DB] Éxito absoluto. Deuda tokenizada.`);
-    
-    res.status(200).json({
-      success: true,
-      message: "Deuda aprobada y tokenizada exitosamente en la Blockchain.",
-      data: resultadoDB
-    });
 
   } catch (error: any) {
     console.error("🚨 [Aprobación Controller] Error:", error);
     res.status(500).json({ 
-      error: "Error procesando la aprobación Web3.", 
+      error: "Error procesando la operación Web3.", 
       detalle: error.message 
     });
   }
@@ -232,11 +305,11 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
     if (!deuda) return res.status(404).json({ error: "Deuda no encontrada." });
 
     if (deuda.estado_validacion !== 'Pendiente de Validación') {
-      return res.status(400).json({ error: "Esta deuda ya fue procesada o rechazada previamente." });
+      return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada previamente." });
     }
     
     if (deuda.empresa_emisora_id !== usuario.empresa_id) {
-      return res.status(403).json({ error: "No tenés permisos para rechazar facturas a nombre de otra empresa." });
+      return res.status(403).json({ error: "No tenés permisos para rechazar esta operación." });
     }
 
     const deudaRechazada = await prisma.transacciones_deuda.update({
@@ -249,12 +322,12 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: "La operación de deuda ha sido rechazada exitosamente.",
+      message: "La operación ha sido rechazada exitosamente.",
       data: deudaRechazada
     });
 
   } catch (error: any) {
     console.error("🚨 [Deudas Controller] Error al rechazar:", error);
-    res.status(500).json({ error: "Error procesando el rechazo de la deuda." });
+    res.status(500).json({ error: "Error procesando el rechazo de la operación." });
   }
 };
