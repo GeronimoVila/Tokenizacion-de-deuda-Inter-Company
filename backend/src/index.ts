@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { probarConexionBFA } from './services/blockchain.js';
 import empresasRoutes from './routes/empresas.routes.js';
-
+import sysadminRoutes from './routes/sysadmin.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import deudasRoutes from './routes/deudas.routes.js';
 import nettingRoutes from './routes/netting.routes.js';
@@ -18,6 +18,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/deudas', deudasRoutes);
 app.use('/api/netting', nettingRoutes);
 app.use('/api/empresas', empresasRoutes);
+app.use('/api/sysadmin', sysadminRoutes);
 
 app.listen(PORT, async () => {
   console.log(`🚀 API REST Node.js/Express corriendo en puerto ${PORT}`);

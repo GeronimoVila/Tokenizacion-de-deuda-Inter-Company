@@ -21,13 +21,29 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
     });
 
     if (!dbUser) {
-      console.warn(`🚨 Login bloqueado: ${email} no pertenece al Holding.`);
+      console.warn(`🚨 Login bloqueado: ${email} no pertenece al sistema.`);
       return res.status(403).json({ error: "Acceso denegado. Usuario no registrado." });
     }
 
-    if (!dbUser.rol_id || !dbUser.empresa_id) {
-      console.error(`🚨 Perfil incompleto para: ${email}`);
-      return res.status(403).json({ error: "Usuario sin rol o empresa asignada." });
+    if (!dbUser.rol_id) {
+      console.error(`🚨 Perfil incompleto: ${email} no tiene rol asignado.`);
+      return res.status(403).json({ error: "Usuario sin rol asignado." });
+    }
+
+    if (dbUser.rol_id === 1) {
+      console.log(`🟢 Login Sysadmin detectado: ${email}`);
+      
+    } else if (dbUser.rol_id === 2) {
+      if (!dbUser.grupo_id) {
+        console.error(`🚨 Perfil incompleto: Admin de Holding ${email} sin grupo asignado.`);
+        return res.status(403).json({ error: "Admin de Holding sin grupo asignado." });
+      }
+      
+    } else {
+      if (!dbUser.empresa_id) {
+        console.error(`🚨 Perfil incompleto: Empleado ${email} sin empresa asignada.`);
+        return res.status(403).json({ error: "Usuario sin empresa asignada." });
+      }
     }
 
     return res.status(200).json({ success: true, data: dbUser });
