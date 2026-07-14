@@ -7,13 +7,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-// 1. Definimos el esquema de validación estricto con Zod
 const holdingSchema = z.object({
   nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   cuit: z.string().regex(/^\d{11}$/, "El CUIT debe contener exactamente 11 números (sin guiones)"),
 });
 
-// Inferimos el tipo TypeScript a partir del esquema
 type HoldingFormData = z.infer<typeof holdingSchema>;
 
 export default function AdminCorePage() {
@@ -22,7 +20,6 @@ export default function AdminCorePage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // 2. Inicializamos React Hook Form
   const {
     register,
     handleSubmit,
@@ -32,31 +29,25 @@ export default function AdminCorePage() {
     resolver: zodResolver(holdingSchema),
   });
 
-  // 3. Protección de ruta (RBAC en Frontend)
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/"); // Redirige al login si no hay sesión
+      router.push("/");
     } else if (status === "authenticated") {
-      // Validamos que el rol sea 1 (Sysadmin). 
-      // NOTA: Asegúrate de que tu NextAuth devuelva 'rol_id' en el objeto session.user
       if (session?.user?.rol_id !== 1) {
-        router.push("/dashboard"); // Si es un usuario normal, al dashboard
+        router.push("/dashboard");
       }
     }
   }, [status, session, router]);
 
-  // Si está cargando la sesión, mostramos un loader
   if (status === "loading") {
     return <div className="flex justify-center items-center h-screen">Verificando credenciales...</div>;
   }
 
-  // 4. Función de envío al Backend
   const onSubmit = async (data: HoldingFormData) => {
     setServerError(null);
     setSuccessMessage(null);
 
     try {
-      // Obtenemos el email de la sesión para el header
       const userEmail = session?.user?.email;
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
@@ -65,7 +56,7 @@ export default function AdminCorePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": userEmail || "", // Inyectamos el header para tu middleware
+          "x-user-email": userEmail || "",
         },
         body: JSON.stringify(data),
       });
@@ -77,7 +68,7 @@ export default function AdminCorePage() {
       }
 
       setSuccessMessage("¡Holding creado exitosamente en la base de datos!");
-      reset(); // Limpiamos el formulario
+      reset();
 
     } catch (error: any) {
       setServerError(error.message);
@@ -98,7 +89,6 @@ export default function AdminCorePage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           
-          {/* Mensajes de feedback */}
           {serverError && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
               {serverError}

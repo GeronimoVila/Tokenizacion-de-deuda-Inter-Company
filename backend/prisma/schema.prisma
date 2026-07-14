@@ -25,6 +25,7 @@ model Empresas {
   nombre           String                @db.VarChar
   cuit             String                @db.VarChar
   wallet_address   String                @db.VarChar
+  activa           Boolean               @default(true)
   
   grupo            Grupos_empresariales  @relation(fields: [grupo_id], references: [id])
   usuarios         User[]

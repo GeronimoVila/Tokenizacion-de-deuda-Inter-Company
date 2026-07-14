@@ -28,8 +28,6 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
       console.error("🚨 Brecha de seguridad o sesión expirada. El backend rechazó la petición.");
-      // Aquí podríamos forzar un deslogueo en caso de que el backend revoque permisos en tiempo real
-      // useAuthStore.getState().logout();
     }
     return Promise.reject(error);
   }
