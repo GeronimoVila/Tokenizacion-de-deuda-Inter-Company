@@ -12,7 +12,26 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   callbacks: {
     async signIn({ user }) {
-      return !!user.email;
+      if (!user.email) return false;
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+        const response = await fetch(`${apiUrl}/auth/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        });
+
+        if (response.ok) {
+          return true;
+        } else {
+          console.warn(`🚨 Intento de acceso denegado para: ${user.email}`);
+          return "/?error=AccesoDenegado"; 
+        }
+      } catch (error) {
+        console.error("🚨 Error en signIn:", error);
+        return false;
+      }
     },
     
     async jwt({ token, user, account }) {
@@ -32,10 +51,8 @@ export const authOptions: NextAuthOptions = {
               token.rol_id = body.data.rol_id;
               token.empresa_id = body.data.empresa_id;
               token.grupo_id = body.data.grupo_id;
-              console.log("✅ Datos del backend inyectados en JWT:", body.data.rol_id);
+              console.log("✅ Datos del backend inyectados en JWT");
             }
-          } else {
-            console.warn("🚨 Usuario no encontrado o no sincronizado en el backend.");
           }
         } catch (error) {
           console.error("🚨 Error comunicándose con el Backend desde NextAuth:", error);
