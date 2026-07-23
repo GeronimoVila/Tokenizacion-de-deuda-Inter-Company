@@ -6,7 +6,7 @@ export default function Home() {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
-    return <div className="p-10 text-center">Cargando seguridad...</div>;
+    return <div className="p-10 text-center">Cargando...</div>;
   }
 
   return (

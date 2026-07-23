@@ -79,10 +79,10 @@ export default function LiquidarDeudaPage() {
         const pendientes = resultPendientes.data.listados.tramites_pendientes || [];
         
         const recibidos = pendientes.filter((p: TransaccionDeuda) => 
-          p.detalle.includes("Liquidación de Saldo") && p.empresa_emisora.id === miEmpresaId
+          p.detalle.includes("Liquidación de Saldo") && p.empresa_receptora.id === miEmpresaId
         );
         const enviados = pendientes.filter((p: TransaccionDeuda) => 
-          p.detalle.includes("Liquidación de Saldo") && p.empresa_receptora.id === miEmpresaId
+          p.detalle.includes("Liquidación de Saldo") && p.empresa_emisora.id === miEmpresaId
         );
 
         setPagosRecibidos(recibidos);
@@ -145,7 +145,7 @@ export default function LiquidarDeudaPage() {
   };
 
   const handleAccionCobro = async (id: number, accion: "aprobar" | "rechazar") => {
-    if (!confirm(accion === "aprobar" ? "¿El dinero ingresó a tu cuenta? Esto quemará los tokens remanentes." : "¿Rechazar comprobante?")) return;
+    if (!confirm(accion === "aprobar" ? "¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes." : "¿Rechazar comprobante?")) return;
     setIsSubmitting(true);
     setMensaje(null);
 
@@ -197,7 +197,6 @@ export default function LiquidarDeudaPage() {
       ) : (
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           
-          {/* COLUMNA 1: MIS DEUDAS (A PAGAR) */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h2 className="text-xl font-bold text-red-700 mb-4 flex items-center gap-2"><span>🔴</span> Deudas Pendientes de Pago</h2>
             {misDeudas.length === 0 ? <p className="text-gray-500 italic text-sm">No tienes deudas activas.</p> : (
@@ -224,14 +223,13 @@ export default function LiquidarDeudaPage() {
               </div>
             )}
 
-            {/* SECCIÓN NUEVA: PAGOS ENVIADOS PENDIENTES */}
             {pagosEnviados.length > 0 && (
               <div className="mt-8 border-t pt-6">
                 <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">Pagos Informados (Esperando Confirmación)</h3>
                 <div className="space-y-3">
                   {pagosEnviados.map(liq => (
                     <div key={liq.id} className="p-3 bg-gray-100 rounded text-sm flex justify-between border border-gray-200">
-                      <span>A: <strong>{liq.empresa_emisora.nombre}</strong></span>
+                      <span>A: <strong>{liq.empresa_receptora.nombre}</strong></span>
                       <span className="text-gray-500 italic">⏳ Pendiente</span>
                     </div>
                   ))}
@@ -240,7 +238,6 @@ export default function LiquidarDeudaPage() {
             )}
           </div>
 
-          {/* COLUMNA 2: MIS COBROS Y VALIDACIONES */}
           <div className="flex flex-col gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-t-yellow-500 border border-gray-200">
               <h2 className="text-xl font-bold text-yellow-700 mb-4 flex items-center gap-2"><span>⚠️</span> Validar Pagos Recibidos</h2>
@@ -249,7 +246,7 @@ export default function LiquidarDeudaPage() {
                   {pagosRecibidos.map((liq) => (
                     <div key={liq.id} className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
                       <div className="flex justify-between items-start mb-2">
-                        <div><p className="text-xs text-gray-500 font-bold uppercase">Deudor informante</p><p className="font-bold text-gray-800">{liq.empresa_receptora.nombre}</p></div>
+                        <div><p className="text-xs text-gray-500 font-bold uppercase">Deudor informante</p><p className="font-bold text-gray-800">{liq.empresa_emisora.nombre}</p></div>
                         <div className="text-right"><p className="text-xl font-black text-yellow-700">${Number(liq.monto).toLocaleString('es-AR')}</p></div>
                       </div>
                       <div className="mb-3">

@@ -38,7 +38,7 @@ export default function CargarDeudaPage() {
   const cargarEmpresas = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const response = await fetch(`${apiUrl}/empresas/holding`, {
+      const response = await fetch(`${apiUrl}/empresas/operativas`, {
         headers: { 
           "x-user-email": session?.user?.email || "" 
         }

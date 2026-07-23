@@ -59,8 +59,8 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
 
     const nuevaDeuda = await prisma.transacciones_deuda.create({
       data: {
-        empresa_emisora_id: contraparteIdNum,
-        empresa_receptora_id: usuario.empresa_id,
+        empresa_emisora_id: usuario.empresa_id, 
+        empresa_receptora_id: contraparteIdNum, 
         monto: montoDecimal,
         detalle: detalle,
         url_documento_respaldo: url_documento,
@@ -92,7 +92,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada." });
     }
     
-    if (deuda.empresa_emisora_id !== usuario.empresa_id) {
+    if (deuda.empresa_receptora_id !== usuario.empresa_id) {
       return res.status(403).json({ error: "No tenés permisos para aprobar esta operación." });
     }
 
@@ -136,8 +136,8 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
             estado_token: 'Activo',
             monto_actual: { gt: 0 },
             transaccion: {
-              empresa_emisora_id: deudorOriginalId,
-              empresa_receptora_id: acreedorOriginalId
+              empresa_emisora_id: acreedorOriginalId,
+              empresa_receptora_id: deudorOriginalId
             }
           },
           orderBy: { id: 'asc' }
@@ -177,7 +177,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
 
     } else {
       if (!deuda.empresa_receptora.wallet_address) {
-        return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada." });
+        return res.status(400).json({ error: "La empresa deudora no tiene una Wallet configurada." });
       }
 
       const montoString = deuda.monto.toString();
@@ -308,7 +308,7 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada previamente." });
     }
     
-    if (deuda.empresa_emisora_id !== usuario.empresa_id) {
+    if (deuda.empresa_receptora_id !== usuario.empresa_id) {
       return res.status(403).json({ error: "No tenés permisos para rechazar esta operación." });
     }
 
@@ -329,5 +329,46 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("🚨 [Deudas Controller] Error al rechazar:", error);
     res.status(500).json({ error: "Error procesando el rechazo de la operación." });
+  }
+};
+
+export const obtenerDeudasPendientes = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const usuario = req.usuario;
+    if (!usuario?.grupo_id) {
+      return res.status(403).json({ error: "Usuario sin grupo asignado." });
+    }
+
+    const isGlobal = [1, 2, 5].includes(usuario.rol_id);
+    const empId = usuario.empresa_id;
+
+    const whereClause: any = {
+      estado_validacion: 'Pendiente de Validación', 
+      empresa_emisora: { grupo_id: usuario.grupo_id }
+    };
+
+    if (!isGlobal && empId) {
+      whereClause.empresa_receptora_id = empId;
+    }
+
+    const alertas = await prisma.transacciones_deuda.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        monto: true,
+        detalle: true,
+        fecha_creacion: true,
+        empresa_emisora: {
+          select: { nombre: true }
+        }
+      },
+      orderBy: { fecha_creacion: 'desc' }
+    });
+
+    return res.status(200).json({ success: true, data: alertas });
+
+  } catch (error) {
+    console.error("[Deudas Controller - obtenerDeudasPendientes]", error);
+    return res.status(500).json({ error: "Error interno al obtener las alertas pendientes." });
   }
 };
