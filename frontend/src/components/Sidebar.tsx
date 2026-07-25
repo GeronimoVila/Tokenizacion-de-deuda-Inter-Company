@@ -4,63 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
+import { menuItems, configItems } from "@/config/routes.config";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const rolId = session?.user?.rol_id;
   const [configOpen, setConfigOpen] = useState(true);
-
-  const menuItems = [
-    { 
-      title: "Inicio (Dashboard)", 
-      href: "/dashboard", 
-      roles: [1, 2, 3, 4, 5]
-    },
-    { 
-      title: "Panel Sysadmin", 
-      href: "/admin-core", 
-      roles: [1]
-    },
-    { 
-      title: "Cargar Deuda", 
-      href: "/cargar-deuda", 
-      roles: [3, 4]
-    },
-    { 
-      title: "Aprobación Dual", 
-      href: "/aprobaciones", 
-      roles: [3, 4]
-    },
-    { 
-      title: "Liquidación Pendiente", 
-      href: "/liquidar-deuda", 
-      roles: [3]
-    },
-    { 
-      title: "Compensación (Netting)", 
-      href: "/netting", 
-      roles: [2]
-    },
-    { 
-      title: "Auditoría Web3", 
-      href: "/dashboard/auditoria", 
-      roles: [2, 3, 4, 5]
-    },
-  ];
-
-  const configItems = [
-    {
-      title: "Empresas Subsidiarias",
-      href: "/dashboard/configuracion/empresas",
-      roles: [2]
-    },
-    {
-      title: "Gestión de Usuarios",
-      href: "/dashboard/configuracion/usuarios",
-      roles: [2, 3]
-    }
-  ];
 
   const menuPermitido = menuItems.filter(item => rolId && item.roles.includes(rolId));
   const configPermitido = configItems.filter(item => rolId && item.roles.includes(rolId));

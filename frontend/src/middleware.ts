@@ -1,40 +1,60 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+// frontend/src/middleware.ts
+import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import type { NextRequest } from 'next/server';
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
-    const path = req.nextUrl.pathname;
+export async function middleware(req: NextRequest) {
+  // Obtenemos el token de sesión de Google Auth inyectado por NextAuth
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const { pathname } = req.nextUrl;
 
-    console.log("\n=== DEBUG MIDDLEWARE ===");
-    console.log("Ruta solicitada:", path);
-    console.log("Token completo extraído:", token);
-    console.log("Rol ID en token:", token?.rol_id, "| Tipo:", typeof token?.rol_id);
-    console.log("========================\n");
-
-    if (!token) {
-      return NextResponse.redirect(new URL("/api/auth/signin", req.url));
-    }
-
-    const rolId = Number(token.rol_id); 
-
-    if (path.startsWith("/netting") && ![1, 2].includes(rolId)) {
-      console.warn(`🚨 Bloqueado en Middleware: El rol ${rolId} no tiene permisos para /netting`);
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
+  // 1. Si no hay token de sesión, redirigimos inmediatamente a la página de login (/)
+  if (!token) {
+    return NextResponse.redirect(new URL('/', req.url));
   }
-);
 
+  // Extraemos el rol del usuario desde el JWT
+  const rolId = token.rol_id as number | undefined;
+
+  // 2. Definimos la matriz RBAC para el enrutamiento del Frontend
+  // Nota: Al ejecutarse en el Edge, no podemos importar fácilmente archivos externos 
+  // complejos, por lo que definimos las reglas de restricción críticas aquí.
+  const accessRules = [
+    { path: '/admin-core', roles: [1] },
+    { path: '/cargar-deuda', roles: [3, 4] },
+    { path: '/aprobaciones', roles: [3, 4] },
+    { path: '/liquidar-deuda', roles: [3] },
+    { path: '/netting', roles: [2] },
+    { path: '/dashboard/configuracion/empresas', roles: [2] },
+    { path: '/dashboard/configuracion/usuarios', roles: [2, 3] },
+  ];
+
+  // 3. Buscamos si la ruta actual coincide con alguna regla protegida
+  const rule = accessRules.find((r) => pathname.startsWith(r.path));
+
+  // 4. Validación de acceso (Type Guarding & RBAC)
+  if (rule) {
+    if (!rolId || !rule.roles.includes(rolId)) {
+      // Si el rol no está en la lista de permitidos, lo expulsamos de regreso al Dashboard
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+  }
+
+  // Si pasa todas las validaciones, permitimos que Next.js renderice la vista
+  return NextResponse.next();
+}
+
+// 5. Configuración del Matcher: Le indica a Next.js qué rutas deben pasar por este filtro
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/netting/:path*",
+    /*
+     * Intercepta todas las rutas excepto:
+     * - api (rutas de API)
+     * - _next/static (archivos estáticos)
+     * - _next/image (imágenes optimizadas)
+     * - favicon.ico (ícono del sitio)
+     * - la ruta raíz (/) que es el login
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|$).*)',
   ],
 };

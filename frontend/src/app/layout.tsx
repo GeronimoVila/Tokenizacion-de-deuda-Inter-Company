@@ -1,25 +1,23 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+// frontend/src/app/layout.tsx
+import React from "react";
 import AuthProvider from "@/components/AuthProvider";
+import AppShell from "@/components/AppShell";
+import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Tokenización Deuda MVP",
-  description: "MVP de Tokenización Intercompany",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
+// Tipado estricto
+interface RootLayoutProps {
   children: React.ReactNode;
-}>) {
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="es">
-      <body className={inter.className}>
+      <body className="antialiased font-sans text-gray-900 bg-gray-50">
         <AuthProvider>
-          {children}
+          {/* El AppShell decide si dibuja o no los menús según la URL */}
+          <AppShell>
+            {children}
+          </AppShell>
         </AuthProvider>
       </body>
     </html>

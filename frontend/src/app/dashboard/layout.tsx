@@ -1,22 +1,16 @@
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+// frontend/src/app/dashboard/layout.tsx
+import React from "react";
 
-export default function DashboardLayout({
-  children,
-}: {
+interface DashboardLayoutProps {
   children: React.ReactNode;
-}) {
-  return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 antialiased font-sans">
-      <Sidebar />
+}
 
-      <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-        <Header />
-        
-        <main className="flex-1 bg-gray-50">
-          {children}
-        </main>
-      </div>
-    </div>
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  return (
+    <React.Fragment>
+      {/* El Sidebar y Header ya están renderizados globalmente en el RootLayout. 
+          Aquí solo inyectamos el contenido hijo. */}
+      {children}
+    </React.Fragment>
   );
 }
