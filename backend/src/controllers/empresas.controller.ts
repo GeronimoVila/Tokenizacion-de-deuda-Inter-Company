@@ -6,11 +6,12 @@ export const obtenerEmpresasDelHolding = async (req: AuthRequest, res: Response)
   try {
     const usuario = req.usuario;
     if (!usuario?.grupo_id) return res.status(403).json({ error: "Usuario sin grupo asignado." });
+    const filtroExclusion = usuario.empresa_id ? { not: usuario.empresa_id } : undefined;
 
     const empresas = await prisma.empresas.findMany({
       where: { 
         grupo_id: usuario.grupo_id,
-        id: { not: usuario.empresa_id },
+        ...(filtroExclusion && { id: filtroExclusion }),
         activa: true
       },
       select: { id: true, nombre: true, cuit: true, wallet_address: true }
@@ -19,7 +20,7 @@ export const obtenerEmpresasDelHolding = async (req: AuthRequest, res: Response)
     return res.status(200).json({ success: true, data: empresas });
   } catch (error) {
     console.error("[Empresas Controller - obtenerEmpresasDelHolding]", error);
-    return res.status(500).json({ error: "Error interno al obtener empresas." });
+    return res.status(500).json({ error: "Error interno al obtener empresas operativas." });
   }
 };
 

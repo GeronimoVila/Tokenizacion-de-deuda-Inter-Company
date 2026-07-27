@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import { createHolding } from '../controllers/sysadmin.controller.js';
+import { registrarNuevoHolding } from '../controllers/sysadmin.controller.js';
 import { requerirRol, ROLES } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
+/**
+ * @route POST /api/sysadmin/holding
+ * @desc Inicializa un nuevo grupo empresarial y su Administrador General.
+ * @access Restringido - Solo SYSADMIN
+ */
 router.post(
-  '/holdings', 
-  requerirRol([ROLES.SYSADMIN]), 
-  createHolding
-);
+  '/holding', requerirRol([ROLES.SYSADMIN]), registrarNuevoHolding);
 
 export default router;

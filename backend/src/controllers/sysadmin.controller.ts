@@ -1,52 +1,88 @@
+// backend/src/controllers/sysadmin.controller.ts
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma.js';
 
-const isValidCUIT = (cuit: string): boolean => {
-  const cuitRegex = /^\d{11}$/;
-  return cuitRegex.test(cuit);
-};
+export const ROLES = {
+  SYSADMIN: 1,
+  ADMIN_HOLDING: 2,
+  ADMIN_SUBSIDIARIA: 3,
+  OPERADOR: 4,
+  AUDITOR: 5,
+} as const;
 
-export const createHolding = async (req: Request, res: Response): Promise<void> => {
+export interface CrearHoldingRequest {
+  nombre: string;
+  cuit: string;
+  adminEmail: string;
+  nombreAdmin: string;
+}
+
+export const registrarNuevoHolding = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { nombre, cuit } = req.body;
+    const { nombre, cuit, adminEmail, nombreAdmin } = req.body as CrearHoldingRequest;
 
-    if (!nombre || !cuit) {
-      res.status(400).json({ error: 'El nombre y el CUIT son obligatorios.' });
+    if (!nombre || !cuit || !adminEmail || !nombreAdmin) {
+      res.status(400).json({ error: "Nombre, CUIT, nombre del admin y correo corporativo son obligatorios." });
       return;
     }
 
-    const cuitLimpio = cuit.replace(/[^0-9]/g, '');
-    if (!isValidCUIT(cuitLimpio)) {
-      res.status(400).json({ error: 'Formato de CUIT inválido. Deben ser 11 números.' });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(adminEmail)) {
+      res.status(400).json({ error: "El formato del correo electrónico corporativo es inválido." });
       return;
     }
 
-    const existingHolding = await prisma.grupos_empresariales.findFirst({
-      where: { cuit: cuitLimpio }
-    });
+    const resultado = await prisma.$transaction(async (tx) => {
+      
+      const holdingExistente = await tx.grupos_empresariales.findFirst({
+        where: { cuit: cuit }
+      });
 
-    if (existingHolding) {
-      res.status(409).json({ error: 'El grupo empresarial ya se encuentra registrado.' });
-      return;
-    }
+      if (holdingExistente) {
+        throw new Error("El CUIT ingresado ya se encuentra registrado en el sistema.");
+      }
 
-    const result = await prisma.$transaction(async (tx) => {
       const nuevoHolding = await tx.grupos_empresariales.create({
         data: {
-          nombre,
-          cuit: cuitLimpio,
+          nombre: nombre,
+          cuit: cuit,
         }
       });
-      return nuevoHolding;
+
+      const nuevoAdmin = await tx.user.create({
+        data: {
+          name: nombreAdmin,
+          email: adminEmail,
+          
+          grupo: {
+            connect: { id: nuevoHolding.id } 
+          },
+
+          rol: {
+            connect: { id: ROLES.ADMIN_HOLDING } 
+          }
+        }
+      });
+
+      return {
+        holding: nuevoHolding,
+        admin: nuevoAdmin
+      };
     });
 
     res.status(201).json({
-      message: 'Grupo empresarial registrado exitosamente.',
-      data: result
+      mensaje: "Entorno corporativo inicializado llave en mano con éxito.",
+      data: resultado
     });
 
-  } catch (error) {
-    console.error('[SysadminController - createHolding] Error:', error);
-    res.status(500).json({ error: 'Error interno del servidor al crear el Holding.' });
+  } catch (error: any) {
+    console.error("[Sysadmin Controller] Error en el Onboarding:", error);
+    
+    if (error.message.includes("CUIT ingresado ya se encuentra registrado")) {
+        res.status(409).json({ error: error.message });
+        return;
+    }
+
+    res.status(500).json({ error: "Error interno del servidor durante el registro del holding." });
   }
 };

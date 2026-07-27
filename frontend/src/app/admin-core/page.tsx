@@ -1,155 +1,201 @@
 "use client";
 
+import React, { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 
-const holdingSchema = z.object({
-  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  cuit: z.string().regex(/^\d{11}$/, "El CUIT debe contener exactamente 11 números (sin guiones)"),
-});
-
-type HoldingFormData = z.infer<typeof holdingSchema>;
+interface HoldingFormData {
+  nombre: string;
+  cuit: string;
+  nombreAdmin: string;
+  adminEmail: string;
+}
 
 export default function AdminCorePage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<HoldingFormData>({
-    resolver: zodResolver(holdingSchema),
+  const { data: session } = useSession();
+  
+  const [formData, setFormData] = useState<HoldingFormData>({
+    nombre: "",
+    cuit: "",
+    nombreAdmin: "",
+    adminEmail: "",
   });
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
-    } else if (status === "authenticated") {
-      if (session?.user?.rol_id !== 1) {
-        router.push("/dashboard");
-      }
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    if (!formData.nombre || !formData.cuit || !formData.nombreAdmin || !formData.adminEmail) {
+      setError("Todos los campos son obligatorios.");
+      setIsLoading(false);
+      return;
     }
-  }, [status, session, router]);
-
-  if (status === "loading") {
-    return <div className="flex justify-center items-center h-screen">Verificando credenciales...</div>;
-  }
-
-  const onSubmit = async (data: HoldingFormData) => {
-    setServerError(null);
-    setSuccessMessage(null);
 
     try {
-      const userEmail = session?.user?.email;
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-
-      const response = await fetch(`${apiUrl}/sysadmin/holdings`, {
+      const backendUrl = "http://localhost:4000/api/sysadmin/holding";
+      
+      const response = await fetch(backendUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": userEmail || "",
+          "x-user-email": session?.user?.email || "sysadmin@bfa.ar",
+          "Authorization": "Bearer simulado_temporal_sysadmin"
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formData),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Ocurrió un error al crear el holding");
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textError = await response.text();
+        console.error("Respuesta no válida del servidor:", textError);
+        throw new Error("El servidor no devolvió una respuesta JSON válida. Verifica que el backend esté corriendo en el puerto 4000.");
       }
 
-      setSuccessMessage("¡Holding creado exitosamente en la base de datos!");
-      reset();
+      const data = await response.json();
 
-    } catch (error: any) {
-      setServerError(error.message);
+      if (!response.ok) {
+        throw new Error(data.error || "Ocurrió un error al registrar el holding.");
+      }
+
+      setSuccessMsg("¡Holding y Administrador creados exitosamente! El entorno está inicializado.");
+      
+      setFormData({
+        nombre: "",
+        cuit: "",
+        nombreAdmin: "",
+        adminEmail: "",
+      });
+
+    } catch (err: any) {
+      console.error("Error en el Onboarding:", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Panel Sysadmin (Top Secret)
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Alta de Grupos Empresariales (Holdings)
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-800">Panel de Infraestructura (Sysadmin)</h1>
+        <p className="text-slate-500 mt-2">
+          Módulo exclusivo para el Onboarding inicial. Aquí se crean los nuevos grupos empresariales y sus gerentes administradores.
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          
-          {serverError && (
-            <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
-              {serverError}
-            </div>
-          )}
-          {successMessage && (
-            <div className="mb-4 bg-green-50 border-l-4 border-green-400 p-4 text-sm text-green-700">
-              {successMessage}
-            </div>
-          )}
-
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
-                Nombre del Holding
-              </label>
-              <div className="mt-1">
-                <input
-                  id="nombre"
-                  type="text"
-                  {...register("nombre")}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.nombre ? "border-red-300" : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                />
-                {errors.nombre && (
-                  <p className="mt-2 text-sm text-red-600">{errors.nombre.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="cuit" className="block text-sm font-medium text-gray-700">
-                CUIT (11 números, sin guiones)
-              </label>
-              <div className="mt-1">
-                <input
-                  id="cuit"
-                  type="text"
-                  {...register("cuit")}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.cuit ? "border-red-300" : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                />
-                {errors.cuit && (
-                  <p className="mt-2 text-sm text-red-600">{errors.cuit.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
-              >
-                {isSubmitting ? "Creando..." : "Registrar Holding"}
-              </button>
-            </div>
-          </form>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-slate-50">
+          <h2 className="text-lg font-semibold text-slate-800">Inicializar Nuevo Holding</h2>
         </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-md text-sm">
+              {error}
+            </div>
+          )}
+          {successMsg && (
+            <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-r-md text-sm">
+              {successMsg}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Datos de la Entidad</h3>
+              
+              <div>
+                <label htmlFor="nombre" className="block text-sm font-medium text-slate-700 mb-1">
+                  Razón Social del Grupo
+                </label>
+                <input
+                  type="text"
+                  id="nombre"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
+                  placeholder="Ej. Grupo Tech S.A."
+                />
+              </div>
+
+              <div>
+                <label htmlFor="cuit" className="block text-sm font-medium text-slate-700 mb-1">
+                  CUIT del Holding
+                </label>
+                <input
+                  type="text"
+                  id="cuit"
+                  name="cuit"
+                  value={formData.cuit}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
+                  placeholder="Sin guiones (Ej. 30123456789)"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cuenta Administrativa</h3>
+              
+              <div>
+                <label htmlFor="nombreAdmin" className="block text-sm font-medium text-slate-700 mb-1">
+                  Nombre del Gerente / Administrador
+                </label>
+                <input
+                  type="text"
+                  id="nombreAdmin"
+                  name="nombreAdmin"
+                  value={formData.nombreAdmin}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
+                  placeholder="Nombre completo"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="adminEmail" className="block text-sm font-medium text-slate-700 mb-1">
+                  Correo Corporativo (Google Auth)
+                </label>
+                <input
+                  type="email"
+                  id="adminEmail"
+                  name="adminEmail"
+                  value={formData.adminEmail}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
+                  placeholder="admin@grupotech.com"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 flex justify-end border-t border-slate-100">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`px-6 py-2.5 rounded-lg text-white font-medium transition-all ${
+                isLoading 
+                  ? "bg-indigo-400 cursor-not-allowed" 
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow"
+              }`}
+            >
+              {isLoading ? "Provisionando Entorno..." : "Registrar Holding y Administrador"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -75,7 +75,7 @@ export default function GestionUsuariosPage() {
       if (dataUsr.success) setUsuarios(dataUsr.data);
 
       if (miRol === 2) {
-        const resEmp = await fetch(`${apiUrl}/empresas/operativas`, { headers: getHeaders() });
+        const resEmp = await fetch(`${apiUrl}/empresas`, { headers: getHeaders() });
         const dataEmp = await resEmp.json();
         if (dataEmp.success) setEmpresas(dataEmp.data);
       }

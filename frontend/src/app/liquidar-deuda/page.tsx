@@ -255,7 +255,7 @@ export default function LiquidarDeudaPage() {
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleAccionCobro(liq.id, "rechazar")} disabled={isSubmitting} className="flex-1 bg-white border border-red-300 text-red-600 py-2 rounded font-bold text-sm">Rechazar</button>
-                        <button onClick={() => handleAccionCobro(liq.id, "aprobar")} disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">Verificar Cobro</button>
+                        <button onClick={() => handleAccionCobro(liq.id, "aprobar")} disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">Validar Cobro</button>
                       </div>
                     </div>
                   ))}
