@@ -9,6 +9,7 @@ import deudasRoutes from './routes/deudas.routes.js';
 import nettingRoutes from './routes/netting.routes.js';
 import usuariosRoutes from './routes/usuarios.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import auditoriaRoutes from './routes/auditoria.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -23,6 +24,7 @@ app.use('/api/empresas', empresasRoutes);
 app.use('/api/sysadmin', sysadminRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/auditoria', auditoriaRoutes);
 
 app.listen(PORT, async () => {
   console.log(`🚀 API REST Node.js/Express corriendo en puerto ${PORT}`);

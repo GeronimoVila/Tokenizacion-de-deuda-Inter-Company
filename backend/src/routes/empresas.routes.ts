@@ -23,4 +23,9 @@ router.patch('/:id/desactivar', requerirRol([ROLES.ADMIN_HOLDING]), desactivarEm
 
 router.patch('/:id/activar', requerirRol([ROLES.ADMIN_HOLDING]), activarEmpresa);
 
+router.get('/todas', requerirRol([ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR, ROLES.AUDITOR]), listarTodasLasEmpresas);
+
+// Las rutas de creación, edición y baja DEBEN seguir siendo exclusivas del Administrador[cite: 1]
+
+
 export default router;
