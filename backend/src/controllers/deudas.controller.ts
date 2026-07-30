@@ -7,14 +7,14 @@ import { ethers } from 'ethers';
 import { holdingContract } from '../services/blockchain.js';
 import { Prisma } from '@prisma/client';
 
-export const registrarDeuda = async (req: AuthRequest, res: Response) => {
+export const registrarDeuda = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { empresa_contraparte_id, monto, detalle } = req.body;
     const archivo = req.file;
     const usuario = req.usuario;
 
-    if (!usuario?.empresa_id || !usuario?.grupo_id) {
-      return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa." });
+    if (!usuario || !usuario.empresa_id || !usuario.grupo_id) {
+      return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa o la sesión es inválida." });
     }
 
     if (!archivo) {
@@ -34,7 +34,9 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "El monto debe ser mayor a 0." });
     }
 
-    if (usuario.empresa_id === contraparteIdNum) return res.status(400).json({ error: "No puedes registrar deuda contigo mismo." });
+    if (usuario.empresa_id === contraparteIdNum) {
+      return res.status(400).json({ error: "No puedes registrar deuda contigo mismo." });
+    }
 
     const contraparte = await prisma.empresas.findUnique({ where: { id: contraparteIdNum } });
     if (!contraparte || contraparte.grupo_id !== usuario.grupo_id) {
@@ -68,18 +70,22 @@ export const registrarDeuda = async (req: AuthRequest, res: Response) => {
       }
     });
 
-    res.status(201).json({ success: true, message: "Deuda e IPFS registrados.", data: nuevaDeuda });
+    return res.status(201).json({ success: true, message: "Deuda e IPFS registrados.", data: nuevaDeuda });
 
   } catch (error) {
     console.error("🚨 [Deudas Controller] Error al registrar:", error);
-    res.status(500).json({ error: "Error interno procesando la solicitud." });
+    return res.status(500).json({ error: "Error interno procesando la solicitud." });
   }
 };
 
-export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
+export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const id = req.params.id as string;
     const usuario = req.usuario;
+
+    if (!usuario || !usuario.empresa_id) {
+      return res.status(403).json({ error: "No autorizado o sin empresa asignada." });
+    }
 
     const deuda = await prisma.transacciones_deuda.findUnique({
       where: { id: parseInt(id) },
@@ -222,18 +228,18 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response) => {
 
   } catch (error: any) {
     console.error("🚨 [Aprobación Controller] Error:", error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: "Error procesando la operación Web3.", 
       detalle: error.message 
     });
   }
 };
 
-export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
+export const obtenerDashboard = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const usuario = req.usuario;
 
-    if (!usuario?.empresa_id) {
+    if (!usuario || !usuario.empresa_id) {
       return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa." });
     }
 
@@ -270,7 +276,7 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
     );
     const saldoNeto = totalTokensAFavor.minus(totalDeudasAPagar);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Dashboard financiero calculado con éxito.",
       data: {
@@ -289,14 +295,18 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response) => {
 
   } catch (error) {
     console.error("🚨 [Deudas Controller] Error al obtener dashboard:", error);
-    res.status(500).json({ error: "Error interno obteniendo los datos de la empresa." });
+    return res.status(500).json({ error: "Error interno obteniendo los datos de la empresa." });
   }
 };
 
-export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
+export const rechazarDeuda = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const id = req.params.id as string;
     const usuario = req.usuario;
+
+    if (!usuario || !usuario.empresa_id) {
+      return res.status(403).json({ error: "Usuario sin autorización para rechazar deudas." });
+    }
 
     const deuda = await prisma.transacciones_deuda.findUnique({
       where: { id: parseInt(id) }
@@ -320,7 +330,7 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
       }
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "La operación ha sido rechazada exitosamente.",
       data: deudaRechazada
@@ -328,21 +338,22 @@ export const rechazarDeuda = async (req: AuthRequest, res: Response) => {
 
   } catch (error: any) {
     console.error("🚨 [Deudas Controller] Error al rechazar:", error);
-    res.status(500).json({ error: "Error procesando el rechazo de la operación." });
+    return res.status(500).json({ error: "Error procesando el rechazo de la operación." });
   }
 };
 
 export const obtenerDeudasPendientes = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const usuario = req.usuario;
-    if (!usuario?.grupo_id) {
-      return res.status(403).json({ error: "Usuario sin grupo asignado." });
+    
+    if (!usuario || !usuario.grupo_id || !usuario.rol_id) {
+      return res.status(403).json({ error: "Usuario sin grupo asignado o permisos incompletos." });
     }
 
     const isGlobal = [1, 2, 5].includes(usuario.rol_id);
     const empId = usuario.empresa_id;
 
-    const whereClause: any = {
+    const whereClause: Prisma.Transacciones_deudaWhereInput = {
       estado_validacion: 'Pendiente de Validación', 
       empresa_emisora: { grupo_id: usuario.grupo_id }
     };

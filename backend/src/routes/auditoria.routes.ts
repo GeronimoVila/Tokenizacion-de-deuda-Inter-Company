@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { buscarHistorialTokens } from '../controllers/auditoria.controller.js';
+import { buscarHistorialTokens, auditarCierresPasivos } from '../controllers/auditoria.controller.js';
 import { requerirRol, ROLES } from '../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -13,6 +13,12 @@ router.get(
   '/filtros', 
   requerirRol([ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR, ROLES.AUDITOR]), 
   buscarHistorialTokens
+);
+
+router.get(
+  '/cierres-pasivos', 
+  requerirRol([ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR, ROLES.AUDITOR]), 
+  auditarCierresPasivos
 );
 
 export default router;

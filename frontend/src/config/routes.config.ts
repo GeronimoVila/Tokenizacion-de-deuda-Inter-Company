@@ -14,6 +14,7 @@ export const menuItems = [
   { title: "Liquidación Pendiente", href: "/liquidar-deuda", roles: [3] },
   { title: "Compensación (Netting)", href: "/netting", roles: [2] },
   { title: "Auditoría Web3", href: "/dashboard/auditoria", roles: [2, 3, 4, 5] },
+  { title: "Auditoría Netting", href: "/dashboard/auditoria/netting", roles: [2, 3, 4, 5] },
 ];
 
 export const configItems = [
