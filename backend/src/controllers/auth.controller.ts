@@ -17,6 +17,7 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
         rol_id: true,
         empresa_id: true,
         grupo_id: true,
+        empresa: { select: { activa: true } }
       }
     });
 
@@ -46,7 +47,12 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
       }
     }
 
-    return res.status(200).json({ success: true, data: dbUser });
+    const userData = {
+      ...dbUser,
+      empresa_activa: dbUser.empresa?.activa ?? true
+    };
+
+    return res.status(200).json({ success: true, data: userData });
 
   } catch (error) {
     console.error("🚨 Error en Auth Controller:", error);

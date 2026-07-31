@@ -15,9 +15,23 @@ interface EmpresaOption {
   nombre: string;
 }
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; 
+
 export default function CargarDeudaPage() {
   const { data: session } = useSession();
   
+  if (session?.user?.empresa_activa === false) {
+    return (
+      <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-lg shadow-sm border border-gray-200 text-center">
+        <h1 className="text-2xl font-bold mb-4 text-gray-900">Acceso Restringido</h1>
+        <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-500 rounded text-left">
+          <p className="font-medium">Tu subsidiaria se encuentra inactiva.</p>
+          <p className="text-sm mt-1">Solo tienes acceso de lectura para visualizar la auditoría histórica de tus saldos pasados. No puedes registrar nuevas operaciones.</p>
+        </div>
+      </div>
+    );
+  }
+
   const [formData, setFormData] = useState<DeudaFormData>({
     empresaDeudoraId: "",
     monto: "",
@@ -66,8 +80,11 @@ export default function CargarDeudaPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      if (file.type !== "application/pdf") {
-        setMensaje({ tipo: "error", texto: "El comprobante debe ser un archivo PDF." });
+      
+      if (file.type !== "application/pdf" || file.size > MAX_FILE_SIZE) {
+        setMensaje({ tipo: "error", texto: "Formato inválido o archivo demasiado pesado" });
+        e.target.value = '';
+        setFormData((prev) => ({ ...prev, comprobante: null }));
         return;
       }
       setFormData((prev) => ({ ...prev, comprobante: file }));
@@ -81,8 +98,15 @@ export default function CargarDeudaPage() {
     setMensaje(null);
 
     try {
-      if (!formData.comprobante) throw new Error("Debes adjuntar un comprobante en formato PDF.");
+      if (!formData.comprobante) {
+        throw new Error("Documento de respaldo PDF obligatorio");
+      }
+      
       if (!session?.user?.empresa_id) throw new Error("No se pudo identificar tu empresa de origen.");
+      
+      if (session.user.empresa_id === Number(formData.empresaDeudoraId)) {
+        throw new Error("La empresa receptora no puede ser idéntica a la emisora");
+      }
 
       const data = new FormData();
       data.append("empresa_contraparte_id", String(formData.empresaDeudoraId));

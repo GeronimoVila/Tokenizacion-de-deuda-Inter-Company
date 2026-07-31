@@ -6,6 +6,7 @@ declare module "next-auth" {
       rol_id?: number;
       empresa_id?: number;
       grupo_id?: number;
+      empresa_activa?: boolean;
     } & DefaultSession["user"];
   }
 

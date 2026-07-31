@@ -217,7 +217,14 @@ export default function LiquidarDeudaPage() {
                       <div><p className="text-xs text-gray-500 font-bold uppercase">Acreedor</p><p className="font-bold text-gray-800">{deuda.acreedor}</p></div>
                       <div className="text-right"><p className="text-xl font-black text-red-600">${Number(deuda.monto_total).toLocaleString('es-AR')}</p></div>
                     </div>
-                    <button onClick={() => setDeudaSeleccionada(deuda)} className="w-full mt-2 bg-white border border-gray-300 text-gray-700 hover:text-blue-600 font-semibold py-2 px-4 rounded shadow-sm text-sm">Informar Transferencia Bancaria</button>
+                    
+                    {session?.user?.empresa_activa === false ? (
+                      <div className="w-full mt-2 text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
+                        Acción bloqueada (Baja Lógica)
+                      </div>
+                    ) : (
+                      <button onClick={() => setDeudaSeleccionada(deuda)} className="w-full mt-2 bg-white border border-gray-300 text-gray-700 hover:text-blue-600 font-semibold py-2 px-4 rounded shadow-sm text-sm">Informar Transferencia Bancaria</button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -253,10 +260,18 @@ export default function LiquidarDeudaPage() {
                         <a href={liq.url_documento_respaldo} target="_blank" className="text-blue-600 text-sm hover:underline font-medium inline-flex items-center gap-1">📄 Ver Comprobante Bancario</a>
                         <p className="text-xs text-gray-500 mt-1 italic">{liq.detalle}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleAccionCobro(liq.id, "rechazar")} disabled={isSubmitting} className="flex-1 bg-white border border-red-300 text-red-600 py-2 rounded font-bold text-sm">Rechazar</button>
-                        <button onClick={() => handleAccionCobro(liq.id, "aprobar")} disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">Validar Cobro</button>
-                      </div>
+
+                      {session?.user?.empresa_activa === false ? (
+                        <div className="w-full text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
+                          Acción bloqueada (Solo Lectura)
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleAccionCobro(liq.id, "rechazar")} disabled={isSubmitting} className="flex-1 bg-white border border-red-300 text-red-600 py-2 rounded font-bold text-sm">Rechazar</button>
+                          <button onClick={() => handleAccionCobro(liq.id, "aprobar")} disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">Validar Cobro</button>
+                        </div>
+                      )}
+
                     </div>
                   ))}
                 </div>

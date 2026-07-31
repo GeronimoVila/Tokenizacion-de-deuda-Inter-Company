@@ -51,6 +51,7 @@ export const authOptions: NextAuthOptions = {
               token.rol_id = body.data.rol_id;
               token.empresa_id = body.data.empresa_id;
               token.grupo_id = body.data.grupo_id;
+              token.empresa_activa = body.data.empresa_activa; 
               console.log("✅ Datos del backend inyectados en JWT");
             }
           }
@@ -63,9 +64,10 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.rol_id = token.rol_id;
-        session.user.empresa_id = token.empresa_id;
-        session.user.grupo_id = token.grupo_id;
+        session.user.rol_id = token.rol_id as number;
+        session.user.empresa_id = token.empresa_id as number;
+        session.user.grupo_id = token.grupo_id as number;
+        session.user.empresa_activa = token.empresa_activa as boolean; 
       }
       return session;
     }

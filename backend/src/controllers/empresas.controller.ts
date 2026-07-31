@@ -44,8 +44,8 @@ export const obtenerEmpresasDelHolding = async (req: AuthRequest, res: Response)
 };
 
 /**
- * @desc Retorna TODO el directorio de subsidiarias activas del holding.
- * Ideal para el RF-07 (Auditoría Web3) para los filtros del menú desplegable.
+ * @desc Retorna TODO el directorio de subsidiarias del holding (Activas e Inactivas).
+ * Vital para cumplir el RF-02 y RF-07 (Auditoría Web3), permitiendo visualizar el historial.
  */
 export const listarTodasLasEmpresas = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -55,15 +55,12 @@ export const listarTodasLasEmpresas = async (req: AuthRequest, res: Response): P
       return;
     }
 
-    // Definimos qué roles deben ser filtrados para excluir su propia subsidiaria
     const rolesFiltrados: number[] = [
       ROLES.ADMIN_SUBSIDIARIA, 
       ROLES.OPERADOR, 
       ROLES.AUDITOR
     ];
 
-    // Si el usuario pertenece a uno de los roles filtrados y tiene una empresa asignada, 
-    // excluimos su propio ID de la lista desplegable.
     const debeExcluirSuEmpresa = usuario.rol_id && rolesFiltrados.includes(usuario.rol_id);
     const filtroExclusion = (debeExcluirSuEmpresa && usuario.empresa_id) 
       ? { not: usuario.empresa_id } 
@@ -72,14 +69,14 @@ export const listarTodasLasEmpresas = async (req: AuthRequest, res: Response): P
     const empresas = await prisma.empresas.findMany({
       where: { 
         grupo_id: usuario.grupo_id,
-        activa: true, // Solo empresas operativas
         ...(filtroExclusion && { id: filtroExclusion })
       },
       select: { 
         id: true, 
         nombre: true, 
         cuit: true, 
-        wallet_address: true 
+        wallet_address: true,
+        activa: true
       },
       orderBy: { 
         nombre: 'asc' 

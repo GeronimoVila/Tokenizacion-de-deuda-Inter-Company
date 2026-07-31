@@ -1,4 +1,3 @@
-// backend/src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma.js';
 
@@ -10,13 +9,13 @@ export const ROLES = {
   AUDITOR: 5,
 };
 
-// 1. Tipado estricto: Reemplazamos el 'any' para cumplir con las normativas de arquitectura
 export interface UsuarioPayload {
   id: number;
   email: string;
   rol_id: number;
-  grupo_id: number | null;   // Mantenemos tu estructura intacta
-  empresa_id: number | null; // Mantenemos tu estructura intacta
+  grupo_id: number | null;
+  empresa_id: number | null;
+  empresa_activa?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -30,7 +29,6 @@ export interface AuthRequest extends Request {
 export const requerirRol = (rolesPermitidos: number[]) => {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      // 2. Type Guarding: Verificamos que el header exista y sea estrictamente un string
       const headerEmail = req.headers['x-user-email'];
 
       if (!headerEmail || typeof headerEmail !== 'string') {
@@ -55,14 +53,13 @@ export const requerirRol = (rolesPermitidos: number[]) => {
         });
       }
 
-      // 3. Solución del error: Utilizamos '?? userEmail' por si Prisma infiere que usuarioDB.email puede ser null.
-      // Dejamos intacta tu asignación de grupo_id y empresa_id.
       req.usuario = {
         id: usuarioDB.id,
         email: usuarioDB.email ?? userEmail, 
         rol_id: usuarioDB.rol_id,
         grupo_id: usuarioDB.grupo_id,
-        empresa_id: usuarioDB.empresa_id
+        empresa_id: usuarioDB.empresa_id,
+        empresa_activa: usuarioDB.empresa?.activa ?? true
       };
 
       next();

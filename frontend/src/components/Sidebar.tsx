@@ -10,9 +10,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const rolId = session?.user?.rol_id;
+  const empresaActiva = session?.user?.empresa_activa; 
   const [configOpen, setConfigOpen] = useState(true);
 
-  const menuPermitido = menuItems.filter(item => rolId && item.roles.includes(rolId));
+  const menuPermitido = menuItems.filter(item => {
+    if (!rolId || !item.roles.includes(rolId)) return false;
+    if (item.requiresActiveCompany && empresaActiva === false) return false;
+    return true;
+  });
+
   const configPermitido = configItems.filter(item => rolId && item.roles.includes(rolId));
 
   if (!rolId) return (

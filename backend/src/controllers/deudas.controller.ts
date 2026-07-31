@@ -1,11 +1,76 @@
-import { Response } from 'express';
+import { Request, Response, RequestHandler } from 'express';
 import axios from 'axios';
 import FormData from 'form-data';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { ethers } from 'ethers';
 import { holdingContract } from '../services/blockchain.js';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+
+interface RechazarDeudaPayload {
+  motivoRechazo: string;
+}
+
+export const rechazarDeuda: RequestHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const usuarioLogueado = authReq.usuario;
+
+    if (!usuarioLogueado) {
+      res.status(401).json({ error: 'Usuario no autenticado.' });
+      return;
+    }
+
+    if (usuarioLogueado.empresa_activa === false) {
+      res.status(403).json({ error: 'Operación denegada. Subsidiaria inactiva (Solo Lectura).' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { motivoRechazo } = req.body as RechazarDeudaPayload;
+
+    if (!motivoRechazo || motivoRechazo.trim() === '') {
+      res.status(400).json({ error: 'Debe proporcionar un motivo de rechazo válido.' });
+      return;
+    }
+
+    const transaccion = await prisma.transacciones_deuda.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!transaccion) {
+      res.status(404).json({ error: 'Operación no encontrada.' });
+      return;
+    }
+
+    if (transaccion.estado_validacion !== 'Pendiente de Validación') {
+      res.status(400).json({ error: 'Solo se pueden rechazar operaciones en estado PENDIENTE.' });
+      return;
+    }
+
+    if (transaccion.empresa_receptora_id !== usuarioLogueado.empresa_id) {
+      res.status(403).json({ error: 'No tiene permisos para rechazar una deuda asignada a otra subsidiaria.' });
+      return;
+    }
+
+    const transaccionRechazada = await prisma.transacciones_deuda.update({
+      where: { id: Number(id) },
+      data: { 
+        estado_validacion: 'RECHAZADA',
+        detalle: `${transaccion.detalle} | MOTIVO RECHAZO: ${motivoRechazo}` 
+      }
+    });
+
+    res.status(200).json({
+      message: 'Operación rechazada exitosamente. El token no será emitido.',
+      data: transaccionRechazada
+    });
+
+  } catch (error) {
+    console.error('[DeudasController] Error al rechazar deuda:', error);
+    res.status(500).json({ error: 'Error interno del servidor al procesar el rechazo.' });
+  }
+};
 
 export const registrarDeuda = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -15,6 +80,10 @@ export const registrarDeuda = async (req: AuthRequest, res: Response): Promise<a
 
     if (!usuario || !usuario.empresa_id || !usuario.grupo_id) {
       return res.status(403).json({ error: "Tu usuario no está vinculado a una empresa o la sesión es inválida." });
+    }
+
+    if (usuario.empresa_activa === false) {
+      return res.status(403).json({ error: "Tu subsidiaria está inactiva. Solo tienes acceso de lectura." });
     }
 
     if (!archivo) {
@@ -35,12 +104,18 @@ export const registrarDeuda = async (req: AuthRequest, res: Response): Promise<a
     }
 
     if (usuario.empresa_id === contraparteIdNum) {
-      return res.status(400).json({ error: "No puedes registrar deuda contigo mismo." });
+      return res.status(400).json({ 
+        error: "La empresa receptora no puede ser idéntica a la emisora" 
+      });
     }
 
     const contraparte = await prisma.empresas.findUnique({ where: { id: contraparteIdNum } });
     if (!contraparte || contraparte.grupo_id !== usuario.grupo_id) {
       return res.status(403).json({ error: "La empresa destino no existe en tu Holding." });
+    }
+
+    if (!contraparte.activa) {
+      return res.status(400).json({ error: "La empresa receptora se encuentra inactiva." });
     }
 
     const formData = new FormData();
@@ -85,6 +160,10 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
 
     if (!usuario || !usuario.empresa_id) {
       return res.status(403).json({ error: "No autorizado o sin empresa asignada." });
+    }
+
+    if (usuario.empresa_activa === false) {
+      return res.status(403).json({ error: "Operación denegada. Subsidiaria inactiva (Solo Lectura)." });
     }
 
     const deuda = await prisma.transacciones_deuda.findUnique({
@@ -299,48 +378,6 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response): Promise
   }
 };
 
-export const rechazarDeuda = async (req: AuthRequest, res: Response): Promise<any> => {
-  try {
-    const id = req.params.id as string;
-    const usuario = req.usuario;
-
-    if (!usuario || !usuario.empresa_id) {
-      return res.status(403).json({ error: "Usuario sin autorización para rechazar deudas." });
-    }
-
-    const deuda = await prisma.transacciones_deuda.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!deuda) return res.status(404).json({ error: "Deuda no encontrada." });
-
-    if (deuda.estado_validacion !== 'Pendiente de Validación') {
-      return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada previamente." });
-    }
-    
-    if (deuda.empresa_receptora_id !== usuario.empresa_id) {
-      return res.status(403).json({ error: "No tenés permisos para rechazar esta operación." });
-    }
-
-    const deudaRechazada = await prisma.transacciones_deuda.update({
-      where: { id: deuda.id },
-      data: { 
-        estado_validacion: 'Rechazada',
-        fecha_validacion: new Date()
-      }
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "La operación ha sido rechazada exitosamente.",
-      data: deudaRechazada
-    });
-
-  } catch (error: any) {
-    console.error("🚨 [Deudas Controller] Error al rechazar:", error);
-    return res.status(500).json({ error: "Error procesando el rechazo de la operación." });
-  }
-};
 
 export const obtenerDeudasPendientes = async (req: AuthRequest, res: Response): Promise<any> => {
   try {

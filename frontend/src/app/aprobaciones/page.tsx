@@ -146,25 +146,31 @@ export default function AprobacionesPage() {
 
               <div className="flex flex-col gap-2 min-w-50">
                 {deuda.empresa_receptora.id === session?.user?.empresa_id ? (
-                  <>
-                    <button
-                      onClick={() => handleAccion(deuda, "aprobar")}
-                      disabled={procesandoId === deuda.id}
-                      className={`w-full px-4 py-3 rounded font-bold text-white shadow-sm transition-all ${
-                        procesandoId === deuda.id ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"
-                      }`}
-                    >
-                      {procesandoId === deuda.id && accionSeleccionada === "aprobar" ? "Cargando..." : "Aprobar (Minting)"}
-                    </button>
-                    
-                    <button
-                      onClick={() => handleAccion(deuda, "rechazar")}
-                      disabled={procesandoId === deuda.id}
-                      className={`w-full px-4 py-2 rounded font-medium text-red-700 bg-white hover:bg-red-50 border border-red-200 transition ${procesandoId === deuda.id && "opacity-50 cursor-not-allowed"}`}
-                    >
-                      {procesandoId === deuda.id && accionSeleccionada === "rechazar" ? "Rechazando..." : "Rechazar Comprobante"}
-                    </button>
-                  </>
+                  session?.user?.empresa_activa === false ? (
+                    <span className="text-sm text-red-600 font-bold bg-red-50 px-4 py-3 rounded border border-red-200 text-center">
+                      Subsidiaria Inactiva (Solo lectura)
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleAccion(deuda, "aprobar")}
+                        disabled={procesandoId === deuda.id}
+                        className={`w-full px-4 py-3 rounded font-bold text-white shadow-sm transition-all ${
+                          procesandoId === deuda.id ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"
+                        }`}
+                      >
+                        {procesandoId === deuda.id && accionSeleccionada === "aprobar" ? "Cargando..." : "Aprobar (Minting)"}
+                      </button>
+                      
+                      <button
+                        onClick={() => handleAccion(deuda, "rechazar")}
+                        disabled={procesandoId === deuda.id}
+                        className={`w-full px-4 py-2 rounded font-medium text-red-700 bg-white hover:bg-red-50 border border-red-200 transition ${procesandoId === deuda.id && "opacity-50 cursor-not-allowed"}`}
+                      >
+                        {procesandoId === deuda.id && accionSeleccionada === "rechazar" ? "Rechazando..." : "Rechazar Comprobante"}
+                      </button>
+                    </>
+                  )
                 ) : (
                   <span className="text-sm text-gray-500 italic bg-gray-100 px-4 py-3 rounded border text-center">Esperando contraparte</span>
                 )}

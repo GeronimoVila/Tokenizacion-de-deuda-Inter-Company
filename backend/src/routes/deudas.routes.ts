@@ -9,7 +9,7 @@ router.post('/registrar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA])
 
 router.post('/:id/aprobar', requerirRol([ROLES.ADMIN_SUBSIDIARIA]), aprobarDeuda);
 
-router.post('/:id/rechazar', requerirRol([ROLES.ADMIN_SUBSIDIARIA]), rechazarDeuda);
+router.post('/:id/rechazar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA, ROLES.ADMIN_HOLDING]), rechazarDeuda);
 
 router.get('/dashboard', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA, ROLES.ADMIN_HOLDING, ROLES.SYSADMIN]), obtenerDashboard);
 
