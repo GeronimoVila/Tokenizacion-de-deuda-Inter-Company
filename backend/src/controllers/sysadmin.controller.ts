@@ -1,4 +1,3 @@
-// backend/src/controllers/sysadmin.controller.ts
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma.js';
 
@@ -19,6 +18,11 @@ export interface CrearHoldingRequest {
 
 export const registrarNuevoHolding = async (req: Request, res: Response): Promise<void> => {
   try {
+    const rawEmailHeader = req.headers['x-user-email'];
+    const sysadminEmail: string | undefined = Array.isArray(rawEmailHeader) 
+      ? rawEmailHeader[0] 
+      : (rawEmailHeader as string | undefined);
+
     const { nombre, cuit, adminEmail, nombreAdmin } = req.body as CrearHoldingRequest;
 
     if (!nombre || !cuit || !adminEmail || !nombreAdmin) {
@@ -46,6 +50,7 @@ export const registrarNuevoHolding = async (req: Request, res: Response): Promis
         data: {
           nombre: nombre,
           cuit: cuit,
+          activo: true 
         }
       });
 
@@ -84,5 +89,45 @@ export const registrarNuevoHolding = async (req: Request, res: Response): Promis
     }
 
     res.status(500).json({ error: "Error interno del servidor durante el registro del holding." });
+  }
+};
+
+export const listarHoldings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const holdings = await prisma.grupos_empresariales.findMany({
+      orderBy: { fecha_creacion: 'desc' }
+    });
+    res.status(200).json(holdings);
+  } catch (error) {
+    console.error("[Sysadmin Controller] Error listando holdings:", error);
+    res.status(500).json({ error: "Error interno al obtener los grupos empresariales." });
+  }
+};
+
+export const toggleEstadoHolding = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rawId = req.params.id;
+    const stringId: string = Array.isArray(rawId) ? rawId[0] : (rawId as string);
+    const holdingId = parseInt(stringId);
+    
+    const { activo } = req.body;
+
+    if (isNaN(holdingId) || typeof activo !== 'boolean') {
+      res.status(400).json({ error: "ID de holding inválido o estado no proporcionado." });
+      return;
+    }
+
+    const holding = await prisma.grupos_empresariales.update({
+      where: { id: holdingId },
+      data: { activo }
+    });
+
+    res.status(200).json({
+      mensaje: `Holding ${activo ? 'reactivado' : 'suspendido'} exitosamente.`,
+      holding
+    });
+  } catch (error) {
+    console.error("[Sysadmin Controller] Error cambiando estado del holding:", error);
+    res.status(500).json({ error: "Error interno al modificar el estado del grupo empresarial." });
   }
 };

@@ -14,6 +14,7 @@ model Grupos_empresariales {
   nombre         String     @db.VarChar
   cuit           String     @db.VarChar
   fecha_creacion DateTime   @default(now()) @db.Timestamp()
+  activo  Boolean  @default(true)
   
   empresas       Empresas[]
   usuarios       User[]

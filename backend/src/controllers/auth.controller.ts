@@ -17,7 +17,8 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
         rol_id: true,
         empresa_id: true,
         grupo_id: true,
-        empresa: { select: { activa: true } }
+        empresa: { select: { activa: true } },
+        grupo: { select: { activo: true } }
       }
     });
 
@@ -49,7 +50,8 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
 
     const userData = {
       ...dbUser,
-      empresa_activa: dbUser.empresa?.activa ?? true
+      empresa_activa: dbUser.empresa?.activa ?? true,
+      holding_activo: dbUser.grupo?.activo ?? true
     };
 
     return res.status(200).json({ success: true, data: userData });

@@ -11,7 +11,11 @@ export async function middleware(req: NextRequest) {
   }
 
   const rolId = token.rol_id as number | undefined;
+  
   const empresaActiva = token.empresa_activa as boolean | undefined;
+  const holdingActivo = token.holding_activo as boolean | undefined;
+
+  const entornoInactivo = (empresaActiva === false || holdingActivo === false);
 
   const accessRules = [
     { path: '/admin-core', roles: [1] },
@@ -31,11 +35,11 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const rutasOperativas = ['/cargar-deuda', '/aprobaciones', '/liquidar-deuda'];
+  const rutasOperativas = ['/cargar-deuda', '/aprobaciones', '/liquidar-deuda', '/netting'];
   const intentaAccederRutaOperativa = rutasOperativas.some(ruta => pathname.startsWith(ruta));
 
-  if (intentaAccederRutaOperativa && empresaActiva === false) {
-    console.warn(`[Middleware] Acceso denegado: Intento de operar en ${pathname} con empresa inactiva.`);
+  if (intentaAccederRutaOperativa && entornoInactivo) {
+    console.warn(`[Middleware] Acceso denegado: Intento de operar en ${pathname} con entorno inactivo.`);
     
     const dashboardUrl = new URL('/dashboard', req.url);
     dashboardUrl.searchParams.set('error', 'baja_logica');

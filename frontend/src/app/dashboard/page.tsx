@@ -1,8 +1,9 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface DashboardMetrics {
   operacionesPendientes: number;
@@ -22,13 +23,22 @@ interface AlertaPendiente {
   fecha_creacion: string;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [alertas, setAlertas] = useState<AlertaPendiente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
   const isGlobalAdmin = [1, 2, 5].includes(session?.user?.rol_id || 0);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+  const empresaActiva = session?.user?.empresa_activa ?? true;
+  const holdingActivo = session?.user?.holding_activo ?? true;
+  const entornoInactivo = (empresaActiva === false || holdingActivo === false);
+  
+  const accesoBloqueado = searchParams.get('error') === 'baja_logica';
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -92,6 +102,37 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      
+      {/* 1. Alertas de Seguridad y RBAC */}
+      {accesoBloqueado && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-md text-sm font-medium shadow-sm flex items-center">
+          <svg className="w-5 h-5 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          Acceso Denegado: Intentó acceder a un módulo operativo mientras el entorno se encuentra suspendido.
+        </div>
+      )}
+
+      {entornoInactivo && (
+        <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start shadow-sm">
+          <div className="shrink-0 pt-0.5">
+            <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-semibold text-amber-800">Entorno en Modo Auditoría</h3>
+            <p className="mt-1 text-sm text-amber-700">
+              {holdingActivo === false 
+                ? "El grupo empresarial ha sido suspendido por la administración global." 
+                : "Su empresa subsidiaria ha sido suspendida temporalmente."}
+              {" "}Su cuenta ha sido limitada a permisos de solo lectura para auditar la trazabilidad en la BFA. No puede emitir (Mint) obligaciones financieras ni aprobar operaciones pendientes.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Cabecera del Dashboard */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
           Hola, {session?.user?.name?.split(' ')[0] || 'Usuario'}
@@ -103,6 +144,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* 3. Tarjetas de Métricas (Lectura segura desde Prisma) */}
       <div className="grid grid-cols-1 gap-6 mb-10 sm:grid-cols-2 lg:grid-cols-3">
         
         <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200 relative hover:shadow-md transition-shadow">
@@ -168,6 +210,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* 4. Módulo de Alertas (Bloqueo del CTA si está en baja lógica) */}
       <div className="bg-white shadow-sm rounded-xl border border-gray-200">
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
           <h3 className="text-lg leading-6 font-semibold text-gray-900">Alertas de Validación Pendientes</h3>
@@ -192,12 +235,21 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center space-x-6">
                     <span className="text-base font-bold text-gray-900">{formatearDinero(alerta.monto)}</span>
-                    <Link 
-                      href="/aprobaciones"
-                      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Revisar PDF &rarr;
-                    </Link>
+                    
+                    {/* Ocultamos el Call To Action si el entorno está bloqueado */}
+                    {!entornoInactivo && (
+                      <Link 
+                        href="/aprobaciones"
+                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Revisar PDF &rarr;
+                      </Link>
+                    )}
+                    {entornoInactivo && (
+                       <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 border border-amber-200 rounded">
+                         Aprobación Bloqueada
+                       </span>
+                    )}
                   </div>
                 </li>
               ))}
@@ -214,5 +266,17 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

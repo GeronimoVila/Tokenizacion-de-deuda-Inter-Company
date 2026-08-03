@@ -16,6 +16,7 @@ export interface UsuarioPayload {
   grupo_id: number | null;
   empresa_id: number | null;
   empresa_activa?: boolean;
+  holding_activo?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -27,15 +28,14 @@ export interface AuthRequest extends Request {
  * @param rolesPermitidos
  */
 export const requerirRol = (rolesPermitidos: number[]) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const headerEmail = req.headers['x-user-email'];
+      const userEmail = req.header('x-user-email');
 
-      if (!headerEmail || typeof headerEmail !== 'string') {
-        return res.status(401).json({ error: "No autorizado. Falta identificar al usuario." });
+      if (!userEmail) {
+        res.status(401).json({ error: "No autorizado. Falta identificar al usuario." });
+        return;
       }
-
-      const userEmail: string = headerEmail;
 
       const usuarioDB = await prisma.user.findUnique({
         where: { email: userEmail },
@@ -43,14 +43,31 @@ export const requerirRol = (rolesPermitidos: number[]) => {
       });
 
       if (!usuarioDB || !usuarioDB.rol_id) {
-        return res.status(403).json({ error: "Acceso denegado. Usuario no registrado o sin rol asignado." });
+        res.status(403).json({ error: "Acceso denegado. Usuario no registrado o sin rol asignado." });
+        return;
       }
 
       if (!rolesPermitidos.includes(usuarioDB.rol_id)) {
         console.warn(`🚨 Intento de acceso bloqueado: ${usuarioDB.email} intentó acceder a una ruta protegida.`);
-        return res.status(403).json({ 
+        res.status(403).json({ 
           error: `Acceso denegado. Se requiere nivel de seguridad superior. Tu rol actual es: ${usuarioDB.rol?.nombre}` 
         });
+        return;
+      }
+
+      const isHoldingInactivo = usuarioDB.grupo && usuarioDB.grupo.activo === false;
+      const isEmpresaInactiva = usuarioDB.empresa && usuarioDB.empresa.activa === false;
+
+      if (isHoldingInactivo || isEmpresaInactiva) {
+        if (req.method !== 'GET') {
+          const entidadInactiva = isHoldingInactivo ? 'El Grupo Empresarial (Holding)' : 'Su Empresa Subsidiaria';
+          console.warn(`🔒 Bloqueo aplicado: ${usuarioDB.email} intentó escribir en sistema con ${entidadInactiva} suspendido.`);
+          
+          res.status(403).json({ 
+            error: `${entidadInactiva} se encuentra suspendido. Su cuenta ha sido limitada temporalmente a 'Modo de Auditoría'.` 
+          });
+          return;
+        }
       }
 
       req.usuario = {
@@ -59,14 +76,15 @@ export const requerirRol = (rolesPermitidos: number[]) => {
         rol_id: usuarioDB.rol_id,
         grupo_id: usuarioDB.grupo_id,
         empresa_id: usuarioDB.empresa_id,
-        empresa_activa: usuarioDB.empresa?.activa ?? true
+        empresa_activa: usuarioDB.empresa?.activa ?? true,
+        holding_activo: usuarioDB.grupo?.activo ?? true
       };
 
       next();
 
     } catch (error) {
       console.error("[Auth Middleware] Error:", error);
-      return res.status(500).json({ error: "Error interno verificando credenciales" });
+      res.status(500).json({ error: "Error interno verificando credenciales" });
     }
   };
 };

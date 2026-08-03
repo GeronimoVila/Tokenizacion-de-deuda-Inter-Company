@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
               token.empresa_id = body.data.empresa_id;
               token.grupo_id = body.data.grupo_id;
               token.empresa_activa = body.data.empresa_activa; 
+              token.holding_activo = body.data.holding_activo; 
               console.log("✅ Datos del backend inyectados en JWT");
             }
           }
@@ -68,6 +69,7 @@ export const authOptions: NextAuthOptions = {
         session.user.empresa_id = token.empresa_id as number;
         session.user.grupo_id = token.grupo_id as number;
         session.user.empresa_activa = token.empresa_activa as boolean; 
+        session.user.holding_activo = token.holding_activo as boolean; 
       }
       return session;
     }

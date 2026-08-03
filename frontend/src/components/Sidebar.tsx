@@ -9,26 +9,34 @@ import { menuItems, configItems } from "@/config/routes.config";
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  
   const rolId = session?.user?.rol_id;
   const empresaActiva = session?.user?.empresa_activa; 
+  const holdingActivo = session?.user?.holding_activo; 
   const [configOpen, setConfigOpen] = useState(true);
+
+  const entornoInactivo = (empresaActiva === false || holdingActivo === false);
 
   const menuPermitido = menuItems.filter(item => {
     if (!rolId || !item.roles.includes(rolId)) return false;
-    if (item.requiresActiveCompany && empresaActiva === false) return false;
+    if (item.requiresActiveCompany && entornoInactivo) return false;
     return true;
   });
 
-  const configPermitido = configItems.filter(item => rolId && item.roles.includes(rolId));
+  const configPermitido = configItems.filter(item => {
+    if (!rolId || !item.roles.includes(rolId)) return false;
+    if (entornoInactivo) return false;
+    return true;
+  });
 
   if (!rolId) return (
-    <div className="flex flex-col w-64 bg-gray-900 h-full border-r border-gray-800 animate-pulse" />
+    <div className="flex flex-col w-64 bg-slate-900 h-full border-r border-slate-800 animate-pulse" />
   );
 
   return (
-    <div className="flex flex-col w-64 bg-gray-900 h-full border-r border-gray-800 text-gray-300">
+    <div className="flex flex-col w-64 bg-slate-900 h-full border-r border-slate-800 text-slate-300">
       
-      <div className="flex items-center justify-center h-20 border-b border-gray-800">
+      <div className="flex items-center justify-center h-20 border-b border-slate-800">
         <h1 className="text-xl font-bold text-white tracking-wider">
           DEUDA <span className="text-indigo-500">B2B</span>
         </h1>
@@ -46,7 +54,7 @@ export default function Sidebar() {
                   className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
                     isActive 
                       ? "bg-indigo-600 text-white shadow-md" 
-                      : "hover:bg-gray-800 hover:text-white"
+                      : "hover:bg-slate-800 hover:text-white"
                   }`}
                 >
                   <span className="text-sm font-medium">{item.title}</span>
@@ -56,10 +64,10 @@ export default function Sidebar() {
           })}
 
           {configPermitido.length > 0 && (
-            <li className="px-4 pt-4 mt-4 border-t border-gray-800">
+            <li className="px-4 pt-4 mt-4 border-t border-slate-800">
               <button 
                 onClick={() => setConfigOpen(!configOpen)}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+                className="flex items-center justify-between w-full px-4 py-2 text-sm font-semibold text-slate-400 uppercase tracking-wider hover:text-white transition-colors"
               >
                 <span>Configuración</span>
                 <svg 
@@ -80,8 +88,8 @@ export default function Sidebar() {
                           href={subItem.href}
                           className={`flex items-center px-4 py-2 ml-2 text-sm rounded-lg transition-colors ${
                             isActive 
-                              ? "bg-gray-800 text-indigo-400 font-medium" 
-                              : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                              ? "bg-slate-800 text-indigo-400 font-medium" 
+                              : "text-slate-400 hover:bg-slate-800 hover:text-white"
                           }`}
                         >
                           {subItem.title}
@@ -97,10 +105,12 @@ export default function Sidebar() {
         </ul>
       </div>
 
-      <div className="p-4 border-t border-gray-800 bg-gray-900">
-        <div className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-800 bg-opacity-50">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          <span className="text-xs font-medium text-gray-400">BFA Testnet Conectada</span>
+      <div className="p-4 border-t border-slate-800 bg-slate-900">
+        <div className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-slate-800 bg-opacity-50">
+          <div className={`w-2 h-2 rounded-full ${entornoInactivo ? 'bg-red-500' : 'bg-green-500'} animate-pulse`}></div>
+          <span className="text-xs font-medium text-slate-400">
+            {entornoInactivo ? "Modo Auditoría" : "BFA Testnet Conectada"}
+          </span>
         </div>
       </div>
     </div>
