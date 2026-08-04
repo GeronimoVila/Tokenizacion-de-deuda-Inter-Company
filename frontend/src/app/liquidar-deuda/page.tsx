@@ -42,9 +42,15 @@ export default function LiquidarDeudaPage() {
   const [pagosEnviados, setPagosEnviados] = useState<TransaccionDeuda[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito"; texto: string } | null>(null);
+  
+  // Estado para el formulario de informe de transferencia
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  
+  // Nuevo estado granular para transacciones Web3 (Bloqueo y Feedback visual)
+  const [procesandoId, setProcesandoId] = useState<number | null>(null);
+  const [tipoAccion, setTipoAccion] = useState<"aprobar" | "rechazar" | null>(null);
 
+  const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito"; texto: string } | null>(null);
   const [deudaSeleccionada, setDeudaSeleccionada] = useState<SaldoGlobal | null>(null);
   const [referenciaBancaria, setReferenciaBancaria] = useState("");
   const [comprobante, setComprobante] = useState<File | null>(null);
@@ -111,7 +117,7 @@ export default function LiquidarDeudaPage() {
     e.preventDefault();
     if (!deudaSeleccionada || !comprobante || !miEmpresaId) return;
 
-    setIsSubmitting(true);
+    setIsSubmittingForm(true);
     setMensaje(null);
 
     try {
@@ -140,13 +146,15 @@ export default function LiquidarDeudaPage() {
     } catch (error: any) {
       setMensaje({ tipo: "error", texto: error.message });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingForm(false);
     }
   };
 
   const handleAccionCobro = async (id: number, accion: "aprobar" | "rechazar") => {
-    if (!confirm(accion === "aprobar" ? "¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes." : "¿Rechazar comprobante?")) return;
-    setIsSubmitting(true);
+    if (!confirm(accion === "aprobar" ? "¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes de manera irreversible en la BFA." : "¿Rechazar comprobante?")) return;
+    
+    setProcesandoId(id);
+    setTipoAccion(accion);
     setMensaje(null);
 
     try {
@@ -156,13 +164,14 @@ export default function LiquidarDeudaPage() {
         headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" },
       });
 
-      if (!res.ok) throw new Error(`Error al ${accion} el pago.`);
-      setMensaje({ tipo: "exito", texto: accion === "aprobar" ? "¡Cobro verificado y Tokens liquidados!" : "Pago rechazado." });
+      if (!res.ok) throw new Error(`Error al ${accion} el pago. Verifique saldos on-chain.`);
+      setMensaje({ tipo: "exito", texto: accion === "aprobar" ? "¡Cobro verificado y Tokens liquidados en la Blockchain!" : "Pago rechazado." });
       cargarDatos();
     } catch (error: any) {
       setMensaje({ tipo: "error", texto: error.message });
     } finally {
-      setIsSubmitting(false);
+      setProcesandoId(null);
+      setTipoAccion(null);
     }
   };
 
@@ -178,6 +187,9 @@ export default function LiquidarDeudaPage() {
 
   const deudasBloqueadas = misDeudas.filter(d => tieneNettingPendiente(d.acreedor_id));
   const deudasParaLiquidar = misDeudas.filter(d => !tieneNettingPendiente(d.acreedor_id));
+  
+  // Variable general para saber si el sistema está ejecutando una llamada Web3 pesada
+  const hayProcesamientoActivo = procesandoId !== null || isSubmittingForm;
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -193,7 +205,7 @@ export default function LiquidarDeudaPage() {
       )}
 
       {isLoading ? (
-        <div className="text-center p-8 text-gray-500">Sincronizando estado de cuenta y banco...</div>
+        <div className="text-center p-8 text-gray-500 font-medium animate-pulse">Sincronizando estado de cuenta con la Blockchain...</div>
       ) : (
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           
@@ -223,7 +235,17 @@ export default function LiquidarDeudaPage() {
                         Acción bloqueada (Baja Lógica)
                       </div>
                     ) : (
-                      <button onClick={() => setDeudaSeleccionada(deuda)} className="w-full mt-2 bg-white border border-gray-300 text-gray-700 hover:text-blue-600 font-semibold py-2 px-4 rounded shadow-sm text-sm">Informar Transferencia Bancaria</button>
+                      <button 
+                        onClick={() => setDeudaSeleccionada(deuda)} 
+                        disabled={hayProcesamientoActivo}
+                        className={`w-full mt-2 border text-sm font-semibold py-2 px-4 rounded shadow-sm transition-all ${
+                          hayProcesamientoActivo 
+                            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:text-blue-600'
+                        }`}
+                      >
+                        Informar Transferencia Bancaria
+                      </button>
                     )}
                   </div>
                 ))}
@@ -250,30 +272,63 @@ export default function LiquidarDeudaPage() {
               <h2 className="text-xl font-bold text-yellow-700 mb-4 flex items-center gap-2"><span>⚠️</span> Validar Pagos Recibidos</h2>
               {pagosRecibidos.length === 0 ? <p className="text-gray-500 italic text-sm">No hay transferencias pendientes de validación.</p> : (
                 <div className="space-y-4">
-                  {pagosRecibidos.map((liq) => (
-                    <div key={liq.id} className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <div><p className="text-xs text-gray-500 font-bold uppercase">Deudor informante</p><p className="font-bold text-gray-800">{liq.empresa_emisora.nombre}</p></div>
-                        <div className="text-right"><p className="text-xl font-black text-yellow-700">${Number(liq.monto).toLocaleString('es-AR')}</p></div>
-                      </div>
-                      <div className="mb-3">
-                        <a href={liq.url_documento_respaldo} target="_blank" className="text-blue-600 text-sm hover:underline font-medium inline-flex items-center gap-1">📄 Ver Comprobante Bancario</a>
-                        <p className="text-xs text-gray-500 mt-1 italic">{liq.detalle}</p>
-                      </div>
+                  {pagosRecibidos.map((liq) => {
+                    const esElProcesado = procesandoId === liq.id;
+                    const estaQuemando = esElProcesado && tipoAccion === "aprobar";
+                    const estaRechazando = esElProcesado && tipoAccion === "rechazar";
 
-                      {session?.user?.empresa_activa === false ? (
-                        <div className="w-full text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
-                          Acción bloqueada (Solo Lectura)
+                    return (
+                      <div key={liq.id} className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div><p className="text-xs text-gray-500 font-bold uppercase">Deudor informante</p><p className="font-bold text-gray-800">{liq.empresa_emisora.nombre}</p></div>
+                          <div className="text-right"><p className="text-xl font-black text-yellow-700">${Number(liq.monto).toLocaleString('es-AR')}</p></div>
                         </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleAccionCobro(liq.id, "rechazar")} disabled={isSubmitting} className="flex-1 bg-white border border-red-300 text-red-600 py-2 rounded font-bold text-sm">Rechazar</button>
-                          <button onClick={() => handleAccionCobro(liq.id, "aprobar")} disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">Validar Cobro</button>
+                        <div className="mb-3">
+                          <a href={liq.url_documento_respaldo} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline font-medium inline-flex items-center gap-1">📄 Ver Comprobante Bancario</a>
+                          <p className="text-xs text-gray-500 mt-1 italic">{liq.detalle}</p>
                         </div>
-                      )}
 
-                    </div>
-                  ))}
+                        {session?.user?.empresa_activa === false ? (
+                          <div className="w-full text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
+                            Acción bloqueada (Solo Lectura)
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleAccionCobro(liq.id, "rechazar")} 
+                              disabled={hayProcesamientoActivo} 
+                              className={`flex-1 border py-2 rounded font-bold text-sm transition-all ${
+                                hayProcesamientoActivo 
+                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                                  : 'bg-white border-red-300 text-red-600 hover:bg-red-50'
+                              }`}
+                            >
+                              {estaRechazando ? "Rechazando..." : "Rechazar"}
+                            </button>
+                            <button 
+                              onClick={() => handleAccionCobro(liq.id, "aprobar")} 
+                              disabled={hayProcesamientoActivo} 
+                              className={`flex-1 py-2 rounded font-bold text-sm text-white transition-all flex justify-center items-center gap-2 ${
+                                hayProcesamientoActivo 
+                                  ? 'bg-gray-400 cursor-not-allowed' 
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
+                            >
+                              {estaQuemando ? (
+                                <>
+                                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  ⏳ Quemando en BFA...
+                                </>
+                              ) : "Validar Cobro"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -298,21 +353,29 @@ export default function LiquidarDeudaPage() {
       {deudaSeleccionada && (
         <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-600 mt-4 animate-fade-in-up">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold">Cargar Comprobante</h3>
-            <button onClick={() => setDeudaSeleccionada(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+            <h3 className="text-xl font-bold">Cargar Comprobante Bancario</h3>
+            <button onClick={() => setDeudaSeleccionada(null)} disabled={isSubmittingForm} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
           </div>
           <form onSubmit={handleSubmitPago} className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Referencia</label>
-              <input type="text" value={referenciaBancaria} onChange={(e) => setReferenciaBancaria(e.target.value)} required placeholder="Ej. TRF-1234567" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500" />
+              <input type="text" value={referenciaBancaria} onChange={(e) => setReferenciaBancaria(e.target.value)} required placeholder="Ej. TRF-1234567" disabled={isSubmittingForm} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 disabled:bg-gray-100" />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Comprobante (PDF)</label>
-              <input type="file" accept="application/pdf" onChange={handleFileChange} required className="w-full p-2 border rounded file:bg-blue-50 file:text-blue-700" />
+              <input type="file" accept="application/pdf" onChange={handleFileChange} required disabled={isSubmittingForm} className="w-full p-2 border rounded file:bg-blue-50 file:text-blue-700 disabled:bg-gray-100" />
             </div>
             <div className="md:col-span-2">
-              <button type="submit" disabled={isSubmitting} className={`w-full py-3 rounded font-bold text-white ${isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                {isSubmitting ? "Subiendo..." : "Confirmar y Enviar Comprobante"}
+              <button type="submit" disabled={isSubmittingForm} className={`w-full py-3 rounded font-bold text-white transition-all flex justify-center items-center gap-2 ${isSubmittingForm ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                {isSubmittingForm ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Subiendo Comprobante...
+                  </>
+                ) : "Confirmar y Enviar Comprobante"}
               </button>
             </div>
           </form>

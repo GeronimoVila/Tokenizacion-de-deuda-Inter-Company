@@ -18,6 +18,7 @@ export const menuItems = [
 ];
 
 export const configItems = [
+  { title: "Perfil Corporativo", href: "/dashboard/configuracion/perfil", roles: [2, 3] },
   { title: "Empresas Subsidiarias", href: "/dashboard/configuracion/empresas", roles: [2] },
   { title: "Gestión de Usuarios", href: "/dashboard/configuracion/usuarios", roles: [2, 3] }
 ];

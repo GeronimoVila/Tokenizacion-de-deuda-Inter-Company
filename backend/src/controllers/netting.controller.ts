@@ -1,8 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { generarPropuestaNetting } from '../services/netting.service.js';
-import { ethers } from 'ethers';
-import { holdingContract } from '../services/blockchain.js';
+import { ejecutarQuemaSegura } from '../services/blockchain.js'; 
 import { prisma } from '../config/prisma.js';
 import { Prisma } from '@prisma/client';
 
@@ -117,7 +116,7 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "No hay deudas para compensar." });
     }
 
-    console.log(`🚀 [Web3] Iniciando Quema de Tokens (Netting) para Holding #${usuario.grupo_id}...`);
+    console.log(`🚀 [Web3] Iniciando proceso de Netting para Holding #${usuario.grupo_id}...`);
 
     const compensacionDB = await prisma.compensaciones.create({
       data: {
@@ -138,26 +137,23 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
          throw new Error(`Una de las empresas no tiene billetera Web3 configurada.`);
       }
 
-      const montoParaBlockchain = ethers.parseUnits(montoACompensar.toString(), 2);
-
-      console.log(`⏳ Quemando tokens de la Wallet de ${empresaA.nombre}...`);
-      const tx1 = await holdingContract.compensarDeuda(
+      console.log(`⏳ Verificando saldo y quemando tokens de ${empresaA.nombre}...`);
+      const receipt1 = await ejecutarQuemaSegura(
         empresaA.wallet_address,
-        montoParaBlockchain,
+        montoACompensar.toString(), // Conversión estricta a texto para proteger los decimales
         usuario.email,
         `COMP-${compensacionDB.id}`
       );
-      await tx1.wait();
 
-      console.log(`⏳ Quemando tokens de la Wallet de ${empresaB.nombre}...`);
-      const tx2 = await holdingContract.compensarDeuda(
+      console.log(`⏳ Verificando saldo y quemando tokens de ${empresaB.nombre}...`);
+      const receipt2 = await ejecutarQuemaSegura(
         empresaB.wallet_address,
-        montoParaBlockchain,
+        montoACompensar.toString(), // Conversión estricta a texto para proteger los decimales
         usuario.email,
         `COMP-${compensacionDB.id}`
       );
-      await tx2.wait();
 
+      // Transacción atómica en PostgreSQL ejecutada solo si la Blockchain confirma éxito
       await prisma.$transaction(async (txPrisma) => {
 
         const aplicarDescuento = async (tokens: any[], hashQuema: string) => {
@@ -193,19 +189,20 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
           }
         };
 
-        await aplicarDescuento(deudasA_B, tx1.hash);
-        await aplicarDescuento(deudasB_A, tx2.hash);
+        // Usamos los hashes criptográficos verificados que nos devolvió ejecutarQuemaSegura
+        await aplicarDescuento(deudasA_B, receipt1.hash);
+        await aplicarDescuento(deudasB_A, receipt2.hash);
       });
 
       resultados.push({
         par_compensado: `${empresaA.nombre} <-> ${empresaB.nombre}`,
-        monto_destruido: montoACompensar,
-        txHash_Quema_A: tx1.hash,
-        txHash_Quema_B: tx2.hash
+        monto_destruido: montoACompensar.toNumber(),
+        txHash_Quema_A: receipt1.hash,
+        txHash_Quema_B: receipt2.hash
       });
     }
 
-    console.log(`✅ [Web3 + DB] Netting completado. Tokens destruidos y DB sincronizada.`);
+    console.log(`✅ [Web3 + DB] Netting completado. Tokens destruidos y BD sincronizada.`);
 
     res.status(200).json({
       success: true,

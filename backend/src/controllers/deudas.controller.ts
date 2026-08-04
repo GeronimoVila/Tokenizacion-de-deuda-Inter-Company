@@ -4,8 +4,8 @@ import FormData from 'form-data';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { ethers } from 'ethers';
-import { holdingContract } from '../services/blockchain.js';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { holdingContract, ejecutarQuemaSegura } from '../services/blockchain.js';
+import { Prisma } from '@prisma/client';
 
 interface RechazarDeudaPayload {
   motivoRechazo: string;
@@ -48,6 +48,7 @@ export const rechazarDeuda: RequestHandler = async (req: Request, res: Response)
       return;
     }
 
+    // RBAC: Solo el operador de la empresa deudora puede rechazar
     if (transaccion.empresa_receptora_id !== usuarioLogueado.empresa_id) {
       res.status(403).json({ error: 'No tiene permisos para rechazar una deuda asignada a otra subsidiaria.' });
       return;
@@ -177,35 +178,37 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada." });
     }
     
+    // RBAC: Sólo la subsidiaria receptora (quien debe el dinero) puede aprobar la obligación
     if (deuda.empresa_receptora_id !== usuario.empresa_id) {
       return res.status(403).json({ error: "No tenés permisos para aprobar esta operación." });
     }
 
     const isLiquidacion = deuda.detalle.includes("Liquidación de Saldo");
+    const deudorOriginalId = deuda.empresa_receptora_id; 
+    const acreedorOriginalId = deuda.empresa_emisora_id; 
+    
+    // DEFINICIÓN COMERCIAL: La empresa emisora de la factura prestó el servicio, por ende, 
+    // es el Acreedor a favor de quien se emite (o quema) el activo digital.
+    const walletAcreedor = deuda.empresa_emisora.wallet_address;
+
+    if (!walletAcreedor) {
+      return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada." });
+    }
+
+    const montoString = deuda.monto.toString();
 
     if (isLiquidacion) {
       console.log(`🚀 [Web3] Iniciando Quema por Liquidación Bancaria #${deuda.id}...`);
 
-      const deudorOriginalId = deuda.empresa_receptora_id; 
-      const acreedorOriginalId = deuda.empresa_emisora_id; 
-      const walletAcreedor = deuda.empresa_emisora.wallet_address;
-
-      if (!walletAcreedor) {
-        return res.status(400).json({ error: "No tienes una Wallet configurada para quemar los tokens." });
-      }
-
-      const montoString = deuda.monto.toString();
-      const montoParaBlockchain = ethers.parseUnits(montoString, 2);
-
-      const tx = await holdingContract.compensarDeuda(
+      // Pre-Flight Check: Abstracción Web3 pura. Protege la BD relacional ante desincronización
+      const receipt = await ejecutarQuemaSegura(
         walletAcreedor,
-        montoParaBlockchain,
+        montoString,
         usuario.email,
         `LIQ-${deuda.id}`
       );
 
-      console.log(`⏳ [Web3] Transacción de quema enviada. TxHash: ${tx.hash}`);
-      await tx.wait();
+      console.log(`⏳ [Web3] Transacción de quema validada y sellada. TxHash: ${receipt.hash}`);
 
       const resultadoDB = await prisma.$transaction(async (txPrisma) => {
         const deudaActualizada = await txPrisma.transacciones_deuda.update({
@@ -228,7 +231,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
           orderBy: { id: 'asc' }
         });
 
-        let restante = new Prisma.Decimal(deuda.monto.toString());
+        let restante = new Prisma.Decimal(montoString);
 
         for (const token of tokensActivos) {
           if (restante.lte(0)) break;
@@ -243,7 +246,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
             data: {
               monto_actual: nuevoMonto,
               estado_token: nuevoEstado,
-              txhash_burn: tx.hash
+              txhash_burn: receipt.hash 
             }
           });
 
@@ -261,15 +264,13 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       });
 
     } else {
-      if (!deuda.empresa_receptora.wallet_address) {
-        return res.status(400).json({ error: "La empresa deudora no tiene una Wallet configurada." });
-      }
-
-      const montoString = deuda.monto.toString();
+      
+      console.log(`🚀 [Web3] Iniciando Emisión (Mint) de Deuda #${deuda.id}...`);
       const montoParaBlockchain = ethers.parseUnits(montoString, 2);
 
+      // El Smart Contract debe emitir a favor del Acreedor (walletAcreedor)
       const tx = await holdingContract.emitirDeuda(
-        deuda.empresa_receptora.wallet_address,
+        walletAcreedor, 
         montoParaBlockchain,
         deuda.empresa_emisora.nombre,
         usuario.email,
@@ -278,6 +279,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
 
       const receipt = await tx.wait();
 
+      // Si tx.wait() falla, el try-catch evita que la DB local registre una emisión falsa.
       const resultadoDB = await prisma.$transaction(async (txPrisma) => {
         const deudaActualizada = await txPrisma.transacciones_deuda.update({
           where: { id: deuda.id },
@@ -308,7 +310,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
   } catch (error: any) {
     console.error("🚨 [Aprobación Controller] Error:", error);
     return res.status(500).json({ 
-      error: "Error procesando la operación Web3.", 
+      error: error.message || "Error procesando la operación Web3.", 
       detalle: error.message 
     });
   }
@@ -377,7 +379,6 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response): Promise
     return res.status(500).json({ error: "Error interno obteniendo los datos de la empresa." });
   }
 };
-
 
 export const obtenerDeudasPendientes = async (req: AuthRequest, res: Response): Promise<any> => {
   try {

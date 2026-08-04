@@ -107,6 +107,7 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
   try {
     const usuario = req.usuario;
 
+    // Validación base para proteger la segmentación de datos del holding
     if (!usuario?.grupo_id) {
       res.status(403).json({ error: "Usuario sin grupo empresarial asignado." });
       return;
@@ -114,10 +115,16 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
 
     const rolesRestringidos: number[] = [ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR, ROLES.AUDITOR];
     
-    let whereNettingClause: Prisma.CompensacionesWhereInput = {};
+    // Filtro base: Restringimos la búsqueda SÓLO a las empresas de este holding específico
+    let whereNettingClause: Prisma.CompensacionesWhereInput = {
+      usuario_ejecutor: { grupo_id: usuario.grupo_id }
+    };
     
     if (usuario.rol_id && rolesRestringidos.includes(usuario.rol_id)) {
       if (!usuario.empresa_id) return;
+      
+      // Si el rol es menor (Subsidiaria), re-asignamos el filtro para limitar aún más:
+      // solo debe ver los netings donde su empresa específica estuvo involucrada.
       whereNettingClause = {
         detalles: {
           some: {
@@ -159,7 +166,11 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
 
     let whereTokensLiquidados: Prisma.Tokens_deudaWhereInput = {
       txhash_burn: { not: null },
-      compensaciones: { none: {} }
+      compensaciones: { none: {} },
+      // Filtramos para asegurar que solo devuelva tokens que pertenecen a empresas del holding del usuario
+      transaccion: {
+          empresa_emisora: { grupo_id: usuario.grupo_id }
+      }
     };
 
     if (usuario.rol_id && rolesRestringidos.includes(usuario.rol_id)) {
