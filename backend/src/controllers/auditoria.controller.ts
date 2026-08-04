@@ -186,6 +186,8 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
           select: {
             fecha_creacion: true,
             monto: true,
+            empresa_emisora_id: true,
+            empresa_receptora_id: true,
             empresa_emisora: { select: { nombre: true, cuit: true } },
             empresa_receptora: { select: { nombre: true, cuit: true } }
           }
@@ -212,6 +214,8 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
         id_token: t.token_id_blockchain,
         txhash_burn: hash,
         monto_saldado: t.transaccion.monto.toString(),
+        acreedor_id: t.transaccion.empresa_emisora_id,
+        deudor_id: t.transaccion.empresa_receptora_id,
         acreedor: t.transaccion.empresa_emisora.nombre,
         deudor: t.transaccion.empresa_receptora.nombre
       });
@@ -238,6 +242,8 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
             id_token: d.token.token_id_blockchain,
             txhash_burn: d.token.txhash_burn,
             monto_saldado: d.monto_compensado.toString(),
+            acreedor_id: d.token.transaccion.empresa_emisora_id,
+            deudor_id: d.token.transaccion.empresa_receptora_id,
             acreedor: d.token.transaccion.empresa_emisora.nombre,
             deudor: d.token.transaccion.empresa_receptora.nombre
           }))

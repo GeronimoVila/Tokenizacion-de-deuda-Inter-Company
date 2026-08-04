@@ -68,6 +68,8 @@ export interface CierrePasivoHistorial {
     id_token: string;
     txhash_burn: string;
     monto_saldado: string;
+    acreedor_id: number;
+    deudor_id: number;
     acreedor: string;
     deudor: string;
   }[];
