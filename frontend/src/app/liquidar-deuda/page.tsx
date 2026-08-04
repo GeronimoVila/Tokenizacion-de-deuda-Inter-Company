@@ -43,10 +43,8 @@ export default function LiquidarDeudaPage() {
   
   const [isLoading, setIsLoading] = useState(true);
   
-  // Estado para el formulario de informe de transferencia
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   
-  // Nuevo estado granular para transacciones Web3 (Bloqueo y Feedback visual)
   const [procesandoId, setProcesandoId] = useState<number | null>(null);
   const [tipoAccion, setTipoAccion] = useState<"aprobar" | "rechazar" | null>(null);
 
@@ -54,6 +52,8 @@ export default function LiquidarDeudaPage() {
   const [deudaSeleccionada, setDeudaSeleccionada] = useState<SaldoGlobal | null>(null);
   const [referenciaBancaria, setReferenciaBancaria] = useState("");
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [modalRechazo, setModalRechazo] = useState<{ isOpen: boolean; liquidacionId: number | null }>({ isOpen: false, liquidacionId: null });
+  const [motivoRechazo, setMotivoRechazo] = useState("");
 
   const miEmpresaId = session?.user?.empresa_id;
 
@@ -150,22 +150,59 @@ export default function LiquidarDeudaPage() {
     }
   };
 
-  const handleAccionCobro = async (id: number, accion: "aprobar" | "rechazar") => {
-    if (!confirm(accion === "aprobar" ? "¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes de manera irreversible en la BFA." : "¿Rechazar comprobante?")) return;
+  const handleAprobarCobro = async (id: number) => {
+    if (!confirm("¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes de manera irreversible en la BFA.")) return;
     
     setProcesandoId(id);
-    setTipoAccion(accion);
+    setTipoAccion("aprobar");
     setMensaje(null);
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const res = await fetch(`${apiUrl}/deudas/${id}/${accion}`, {
+      const res = await fetch(`${apiUrl}/deudas/${id}/aprobar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" },
       });
 
-      if (!res.ok) throw new Error(`Error al ${accion} el pago. Verifique saldos on-chain.`);
-      setMensaje({ tipo: "exito", texto: accion === "aprobar" ? "¡Cobro verificado y Tokens liquidados en la Blockchain!" : "Pago rechazado." });
+      if (!res.ok) throw new Error("Error al aprobar el pago. Verifique saldos on-chain.");
+      setMensaje({ tipo: "exito", texto: "¡Cobro verificado y Tokens liquidados en la Blockchain!" });
+      cargarDatos();
+    } catch (error: any) {
+      setMensaje({ tipo: "error", texto: error.message });
+    } finally {
+      setProcesandoId(null);
+      setTipoAccion(null);
+    }
+  };
+
+  const abrirModalRechazo = (id: number) => {
+    setModalRechazo({ isOpen: true, liquidacionId: id });
+    setMotivoRechazo("");
+  };
+
+  const confirmarRechazo = async () => {
+    if (!modalRechazo.liquidacionId || !motivoRechazo.trim()) {
+      setMensaje({ tipo: "error", texto: "Debe proporcionar un motivo de rechazo válido." });
+      return;
+    }
+    
+    setProcesandoId(modalRechazo.liquidacionId);
+    setTipoAccion("rechazar");
+    setMensaje(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const res = await fetch(`${apiUrl}/deudas/${modalRechazo.liquidacionId}/rechazar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" },
+        body: JSON.stringify({ motivoRechazo })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al rechazar el pago.");
+      
+      setMensaje({ tipo: "exito", texto: "Comprobante rechazado. La contraparte deberá informarlo nuevamente." });
+      setModalRechazo({ isOpen: false, liquidacionId: null });
       cargarDatos();
     } catch (error: any) {
       setMensaje({ tipo: "error", texto: error.message });
@@ -188,11 +225,10 @@ export default function LiquidarDeudaPage() {
   const deudasBloqueadas = misDeudas.filter(d => tieneNettingPendiente(d.acreedor_id));
   const deudasParaLiquidar = misDeudas.filter(d => !tieneNettingPendiente(d.acreedor_id));
   
-  // Variable general para saber si el sistema está ejecutando una llamada Web3 pesada
   const hayProcesamientoActivo = procesandoId !== null || isSubmittingForm;
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6 relative">
       <div className="mb-8 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">Liquidación de Saldos Remanentes</h1>
         <p className="text-gray-600 mt-2">Informa tus pagos físicos únicamente para las deudas unilaterales que queden luego del Netting.</p>
@@ -295,7 +331,7 @@ export default function LiquidarDeudaPage() {
                         ) : (
                           <div className="flex gap-2">
                             <button 
-                              onClick={() => handleAccionCobro(liq.id, "rechazar")} 
+                              onClick={() => abrirModalRechazo(liq.id)} 
                               disabled={hayProcesamientoActivo} 
                               className={`flex-1 border py-2 rounded font-bold text-sm transition-all ${
                                 hayProcesamientoActivo 
@@ -303,10 +339,10 @@ export default function LiquidarDeudaPage() {
                                   : 'bg-white border-red-300 text-red-600 hover:bg-red-50'
                               }`}
                             >
-                              {estaRechazando ? "Rechazando..." : "Rechazar"}
+                              Rechazar
                             </button>
                             <button 
-                              onClick={() => handleAccionCobro(liq.id, "aprobar")} 
+                              onClick={() => handleAprobarCobro(liq.id)} 
                               disabled={hayProcesamientoActivo} 
                               className={`flex-1 py-2 rounded font-bold text-sm text-white transition-all flex justify-center items-center gap-2 ${
                                 hayProcesamientoActivo 
@@ -379,6 +415,43 @@ export default function LiquidarDeudaPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {modalRechazo.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md border-t-4 border-red-500">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Rechazar Comprobante Bancario</h3>
+            <p className="text-sm text-gray-600 mb-4">Indique el motivo del rechazo. Esta información será enviada a la empresa deudora para que suba un comprobante válido.</p>
+            
+            <textarea
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 mb-4 resize-none outline-none"
+              rows={4}
+              placeholder="Ej: El comprobante está ilegible, la transferencia no impactó..."
+              value={motivoRechazo}
+              onChange={(e) => setMotivoRechazo(e.target.value)}
+              disabled={procesandoId === modalRechazo.liquidacionId}
+            ></textarea>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setModalRechazo({ isOpen: false, liquidacionId: null })}
+                className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded transition-colors"
+                disabled={procesandoId === modalRechazo.liquidacionId}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmarRechazo}
+                className={`px-4 py-2 rounded font-bold text-white transition-colors ${
+                  procesandoId === modalRechazo.liquidacionId ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                }`}
+                disabled={procesandoId === modalRechazo.liquidacionId}
+              >
+                {procesandoId === modalRechazo.liquidacionId ? "Procesando..." : "Confirmar Rechazo"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
