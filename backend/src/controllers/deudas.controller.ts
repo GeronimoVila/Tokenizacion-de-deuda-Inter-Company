@@ -48,7 +48,6 @@ export const rechazarDeuda: RequestHandler = async (req: Request, res: Response)
       return;
     }
 
-    // RBAC: Solo el operador de la empresa deudora puede rechazar
     if (transaccion.empresa_receptora_id !== usuarioLogueado.empresa_id) {
       res.status(403).json({ error: 'No tiene permisos para rechazar una deuda asignada a otra subsidiaria.' });
       return;
@@ -178,7 +177,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       return res.status(400).json({ error: "Esta operación ya fue procesada o rechazada." });
     }
     
-    // RBAC: Sólo la subsidiaria receptora (quien debe el dinero) puede aprobar la obligación
     if (deuda.empresa_receptora_id !== usuario.empresa_id) {
       return res.status(403).json({ error: "No tenés permisos para aprobar esta operación." });
     }
@@ -187,8 +185,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
     const deudorOriginalId = deuda.empresa_receptora_id; 
     const acreedorOriginalId = deuda.empresa_emisora_id; 
     
-    // DEFINICIÓN COMERCIAL: La empresa emisora de la factura prestó el servicio, por ende, 
-    // es el Acreedor a favor de quien se emite (o quema) el activo digital.
     const walletAcreedor = deuda.empresa_emisora.wallet_address;
 
     if (!walletAcreedor) {
@@ -200,7 +196,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
     if (isLiquidacion) {
       console.log(`🚀 [Web3] Iniciando Quema por Liquidación Bancaria #${deuda.id}...`);
 
-      // Pre-Flight Check: Abstracción Web3 pura. Protege la BD relacional ante desincronización
       const receipt = await ejecutarQuemaSegura(
         walletAcreedor,
         montoString,
@@ -268,7 +263,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       console.log(`🚀 [Web3] Iniciando Emisión (Mint) de Deuda #${deuda.id}...`);
       const montoParaBlockchain = ethers.parseUnits(montoString, 2);
 
-      // El Smart Contract debe emitir a favor del Acreedor (walletAcreedor)
       const tx = await holdingContract.emitirDeuda(
         walletAcreedor, 
         montoParaBlockchain,
@@ -279,7 +273,6 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
 
       const receipt = await tx.wait();
 
-      // Si tx.wait() falla, el try-catch evita que la DB local registre una emisión falsa.
       const resultadoDB = await prisma.$transaction(async (txPrisma) => {
         const deudaActualizada = await txPrisma.transacciones_deuda.update({
           where: { id: deuda.id },
@@ -336,13 +329,15 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response): Promise
       include: { empresa_receptora: true }
     });
 
-    const pendientes = await prisma.transacciones_deuda.findMany({
+    const pendientesYRechazadas = await prisma.transacciones_deuda.findMany({
       where: {
         OR: [
           { empresa_emisora_id: empresaId },
           { empresa_receptora_id: empresaId }
         ],
-        estado_validacion: 'Pendiente de Validación'
+        estado_validacion: {
+          in: ['Pendiente de Validación', 'RECHAZADA']
+        }
       },
       include: { empresa_emisora: true, empresa_receptora: true }
     });
@@ -369,7 +364,7 @@ export const obtenerDashboard = async (req: AuthRequest, res: Response): Promise
         listados: {
           mis_tokens_por_cobrar: cobrosEmitidos,
           mis_deudas_por_pagar: pagosEmitidos,
-          tramites_pendientes: pendientes
+          tramites_pendientes: pendientesYRechazadas
         }
       }
     });
@@ -419,5 +414,85 @@ export const obtenerDeudasPendientes = async (req: AuthRequest, res: Response): 
   } catch (error) {
     console.error("[Deudas Controller - obtenerDeudasPendientes]", error);
     return res.status(500).json({ error: "Error interno al obtener las alertas pendientes." });
+  }
+};
+
+export const reenviarDeudaRechazada = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const id = req.params.id as string;
+    const { monto, detalle } = req.body;
+    const archivo = req.file;
+    const usuario = req.usuario;
+
+    if (!usuario || !usuario.empresa_id) {
+      return res.status(403).json({ error: "No autorizado o sin empresa asignada." });
+    }
+
+    if (usuario.empresa_activa === false) {
+      return res.status(403).json({ error: "Tu subsidiaria está inactiva. Solo tienes acceso de lectura." });
+    }
+
+    const deudaExistente = await prisma.transacciones_deuda.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!deudaExistente) return res.status(404).json({ error: "Deuda no encontrada." });
+
+    if (deudaExistente.estado_validacion !== 'RECHAZADA') {
+      return res.status(400).json({ error: "Solo se pueden editar operaciones que hayan sido rechazadas." });
+    }
+
+    if (deudaExistente.empresa_emisora_id !== usuario.empresa_id) {
+      return res.status(403).json({ error: "No tienes permisos para corregir esta operación." });
+    }
+
+    let montoDecimal = deudaExistente.monto;
+    if (monto) {
+      try {
+        montoDecimal = new Prisma.Decimal(monto);
+        if (montoDecimal.lte(0)) throw new Error();
+      } catch (error) {
+        return res.status(400).json({ error: "El formato del nuevo monto es inválido o menor a 0." });
+      }
+    }
+
+    let url_documento = deudaExistente.url_documento_respaldo;
+    if (archivo) {
+      const formData = new FormData();
+      formData.append('file', archivo.buffer, {
+        filename: archivo.originalname,
+        contentType: archivo.mimetype,
+      });
+
+      const pinataResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
+        headers: {
+          'Authorization': `Bearer ${process.env.PINATA_JWT}`,
+          ...formData.getHeaders()
+        }
+      });
+      url_documento = `https://gateway.pinata.cloud/ipfs/${pinataResponse.data.IpfsHash}`;
+    }
+
+    const detalleLimpio = detalle ? detalle : deudaExistente.detalle.split(" | MOTIVO RECHAZO: ")[0];
+
+    const deudaActualizada = await prisma.transacciones_deuda.update({
+      where: { id: parseInt(id) },
+      data: {
+        monto: montoDecimal,
+        detalle: detalleLimpio,
+        url_documento_respaldo: url_documento,
+        estado_validacion: 'Pendiente de Validación'
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Operación corregida y reenviada exitosamente a la contraparte.",
+      data: deudaActualizada
+    });
+
+  } catch (error: any) {
+    console.error("🚨 [Deudas Controller] Error al reenviar deuda:", error);
+    return res.status(500).json({ error: "Error interno procesando la corrección." });
   }
 };

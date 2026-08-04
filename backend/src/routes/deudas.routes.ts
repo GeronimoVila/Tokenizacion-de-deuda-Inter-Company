@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registrarDeuda, aprobarDeuda, rechazarDeuda, obtenerDashboard, obtenerDeudasPendientes } from '../controllers/deudas.controller.js';
+import { registrarDeuda, aprobarDeuda, rechazarDeuda, obtenerDashboard, obtenerDeudasPendientes, reenviarDeudaRechazada } from '../controllers/deudas.controller.js';
 import { requerirRol, ROLES } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/upload.middleware.js';
 
@@ -14,5 +14,7 @@ router.post('/:id/rechazar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARI
 router.get('/dashboard', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA, ROLES.ADMIN_HOLDING, ROLES.SYSADMIN]), obtenerDashboard);
 
 router.get('/pendientes', requerirRol([ROLES.SYSADMIN, ROLES.ADMIN_HOLDING, ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR, ROLES.AUDITOR]), obtenerDeudasPendientes);
+
+router.post('/:id/reenviar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA]), upload.single('comprobante'), reenviarDeudaRechazada);
 
 export default router;

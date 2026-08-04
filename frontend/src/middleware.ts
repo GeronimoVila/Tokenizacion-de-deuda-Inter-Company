@@ -21,6 +21,7 @@ export async function middleware(req: NextRequest) {
     { path: '/admin-core', roles: [1] },
     { path: '/cargar-deuda', roles: [3, 4] },
     { path: '/aprobaciones', roles: [3, 4] },
+    { path: '/correcciones', roles: [3, 4] },
     { path: '/liquidar-deuda', roles: [3] },
     { path: '/netting', roles: [2] },
     { path: '/dashboard/configuracion/empresas', roles: [2] },

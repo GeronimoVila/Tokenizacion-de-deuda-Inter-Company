@@ -6,7 +6,7 @@ export interface FiltrosAuditoria {
   contraparteId?: string;
   montoMin?: string;
   montoMax?: string;
-  estadoToken?: 'Emitida' | 'Liquidada' | 'Pendiente de Validación' | 'Rechazada' | '';
+  estadoToken?: 'Emitida' | 'Liquidada' | 'Pendiente de Validación' | 'RECHAZADA' | '';
 }
 
 export interface EmpresaBasica {
@@ -20,7 +20,7 @@ export interface TransaccionUnificada {
   monto: string;
   detalle: string;
   url_documento_respaldo: string;
-  estado_validacion: 'Emitida' | 'Liquidada' | 'Pendiente de Validación' | 'Rechazada';
+  estado_validacion: 'Emitida' | 'Liquidada' | 'Pendiente de Validación' | 'RECHAZADA';
   fecha_creacion: string;
   fecha_validacion?: string;
   empresa_emisora: { nombre: string; cuit: string };

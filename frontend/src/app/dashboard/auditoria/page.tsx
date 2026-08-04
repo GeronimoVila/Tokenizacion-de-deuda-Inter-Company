@@ -94,11 +94,11 @@ export default function AuditoriaWeb3Page() {
   };
 
   const getStatusBadge = (estado: string, tokenStatus?: string) => {
-    if (estado === 'Rechazada') return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-700">Rechazada</span>;
+    if (estado === 'RECHAZADA') return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-700">Rechazada</span>;
     if (estado === 'Pendiente de Validación') return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-100 text-yellow-700">Pendiente de Aprobación</span>;
     if (tokenStatus === 'Activo') return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-700">Token Activo (Vigente)</span>;
     if (tokenStatus === 'Quemado') return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-gray-200 text-gray-700">Saldada (Token Quemado)</span>;
-    return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-100 text-blue-700">Liquidada</span>;
+    return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-100 text-blue-700">{estado}</span>;
   };
 
   return (
@@ -119,7 +119,7 @@ export default function AuditoriaWeb3Page() {
               <option value="Pendiente de Validación">Pendientes de Validación</option>
               <option value="Emitida">Emitidas (Token Activo)</option>
               <option value="Liquidada">Liquidadas (Token Quemado)</option>
-              <option value="Rechazada">Rechazadas</option>
+              <option value="RECHAZADA">Rechazadas</option>
             </select>
           </div>
           
@@ -128,7 +128,7 @@ export default function AuditoriaWeb3Page() {
             <select name="contraparteId" value={filtros.contraparteId} onChange={handleFilterChange} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm">
               <option value="">Todas las empresas</option>
               {empresas.map((empresa) => (
-                <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>
+                <option key={empresa.id} value={empresa.id.toString()}>{empresa.nombre}</option>
               ))}
             </select>
           </div>
@@ -160,15 +160,16 @@ export default function AuditoriaWeb3Page() {
 
         {transacciones.map((op) => {
           const tokenData = op.tokens_deuda?.[0];
+          const esRechazada = op.estado_validacion === 'RECHAZADA';
 
           return (
-            <div key={op.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+            <div key={op.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden ${esRechazada ? 'opacity-80 border-gray-200 bg-gray-50' : 'border-slate-200'}`}>
+              <div className={`border-b px-6 py-4 flex justify-between items-center ${esRechazada ? 'bg-gray-100 border-gray-200' : 'bg-slate-50 border-slate-200'}`}>
                 <div>
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                     Operación de Deuda #{op.id}
                   </span>
-                  <h3 className="text-lg font-bold text-slate-800 mt-1">
+                  <h3 className={`text-lg font-bold mt-1 ${esRechazada ? 'text-gray-500' : 'text-slate-800'}`}>
                     Monto: ${Number(op.monto).toLocaleString('es-AR')} ARS
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">Registrada el: {formatearFecha(op.fecha_creacion)}</p>
@@ -236,9 +237,9 @@ export default function AuditoriaWeb3Page() {
                   ) : (
                     <div className="text-center p-4">
                       <p className="text-xs text-slate-400">
-                        {op.estado_validacion === 'Pendiente de Validación' 
-                          ? "A la espera de validación de la contraparte para emitir el pagaré digital en la BFA." 
-                          : "Operación rechazada. No se ha generado ningún activo en la red BFA."}
+                        {esRechazada 
+                          ? "Operación rechazada. No se ha generado ningún activo en la red BFA."
+                          : "A la espera de validación de la contraparte para emitir el pagaré digital en la BFA."}
                       </p>
                     </div>
                   )}

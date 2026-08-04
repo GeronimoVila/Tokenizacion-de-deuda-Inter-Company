@@ -11,6 +11,7 @@ export const menuItems = [
   { title: "Panel Sysadmin", href: "/admin-core", roles: [1] },
   { title: "Cargar Deuda", href: "/cargar-deuda", roles: [3, 4], requiresActiveCompany: true },
   { title: "Aprobación Dual", href: "/aprobaciones", roles: [3, 4], requiresActiveCompany: true },
+  { title: "Correcciones", href: "/correcciones", roles: [3, 4], requiresActiveCompany: true },
   { title: "Liquidación Pendiente", href: "/liquidar-deuda", roles: [3], requiresActiveCompany: true },
   { title: "Compensación (Netting)", href: "/netting", roles: [2], requiresActiveCompany: true },
   { title: "Auditoría Web3", href: "/dashboard/auditoria", roles: [2, 3, 4, 5] },

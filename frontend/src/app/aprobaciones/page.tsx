@@ -28,6 +28,8 @@ export default function AprobacionesPage() {
   const [accionSeleccionada, setAccionSeleccionada] = useState<"aprobar" | "rechazar" | null>(null);
   
   const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito", texto: string } | null>(null);
+  const [modalRechazo, setModalRechazo] = useState<{ isOpen: boolean; deudaId: number | null }>({ isOpen: false, deudaId: null });
+  const [motivoRechazo, setMotivoRechazo] = useState("");
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -58,22 +60,16 @@ export default function AprobacionesPage() {
     }
   };
 
-  const handleAccion = async (deuda: TransaccionDeuda, accion: "aprobar" | "rechazar") => {
-    if (accion === "aprobar") {
-      if (!confirm("¿Estás seguro de aprobar esta deuda? Esto emitirá un Token en la Blockchain y es irreversible.")) return;
-    } else {
-      if (!confirm("¿Estás seguro de rechazar esta operación?")) return;
-    }
+  const handleAprobar = async (deuda: TransaccionDeuda) => {
+    if (!confirm("¿Estás seguro de aprobar esta deuda? Esto emitirá un Token en la Blockchain y es irreversible.")) return;
     
     setProcesandoId(deuda.id);
-    setAccionSeleccionada(accion);
+    setAccionSeleccionada("aprobar");
     setMensaje(null);
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const endpoint = accion === "aprobar" ? `${apiUrl}/deudas/${deuda.id}/aprobar` : `${apiUrl}/deudas/${deuda.id}/rechazar`;
-
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${apiUrl}/deudas/${deuda.id}/aprobar`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -82,15 +78,50 @@ export default function AprobacionesPage() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al aprobar la operación.");
 
-      if (!res.ok) throw new Error(data.error || `Error al ${accion} la operación.`);
+      setMensaje({ tipo: "exito", texto: `¡Deuda #${deuda.id} tokenizada (acuñada) con éxito en Web3!` });
+      cargarPendientes(); 
+    } catch (error: any) {
+      console.error(error);
+      setMensaje({ tipo: "error", texto: error.message });
+    } finally {
+      setProcesandoId(null);
+      setAccionSeleccionada(null);
+    }
+  };
 
-      if (accion === "aprobar") {
-        setMensaje({ tipo: "exito", texto: `¡Deuda #${deuda.id} tokenizada (acuñada) con éxito en Web3!` });
-      } else {
-        setMensaje({ tipo: "exito", texto: `Operación #${deuda.id} rechazada correctamente.` });
-      }
-      
+  const abrirModalRechazo = (id: number) => {
+    setModalRechazo({ isOpen: true, deudaId: id });
+    setMotivoRechazo("");
+  };
+
+  const confirmarRechazo = async () => {
+    if (!modalRechazo.deudaId || !motivoRechazo.trim()) {
+      setMensaje({ tipo: "error", texto: "Debe proporcionar un motivo de rechazo válido para el emisor." });
+      return;
+    }
+    
+    setProcesandoId(modalRechazo.deudaId);
+    setAccionSeleccionada("rechazar");
+    setMensaje(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      const res = await fetch(`${apiUrl}/deudas/${modalRechazo.deudaId}/rechazar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": session?.user?.email || "",
+        },
+        body: JSON.stringify({ motivoRechazo }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al rechazar la operación.");
+
+      setMensaje({ tipo: "exito", texto: `Operación #${modalRechazo.deudaId} rechazada. Se notificará a la empresa emisora.` });
+      setModalRechazo({ isOpen: false, deudaId: null });
       cargarPendientes(); 
     } catch (error: any) {
       console.error(error);
@@ -104,7 +135,7 @@ export default function AprobacionesPage() {
   if (isLoading) return <div className="p-8 text-center text-gray-600">Cargando operaciones pendientes...</div>;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-6 relative">
       <h1 className="text-3xl font-bold mb-2 text-gray-800">Bandeja de Aprobación Dual</h1>
       <p className="text-gray-600 mb-6">Operaciones y remitos pendientes de revisión corporativa.</p>
 
@@ -153,7 +184,7 @@ export default function AprobacionesPage() {
                   ) : (
                     <>
                       <button
-                        onClick={() => handleAccion(deuda, "aprobar")}
+                        onClick={() => handleAprobar(deuda)}
                         disabled={procesandoId === deuda.id}
                         className={`w-full px-4 py-3 rounded font-bold text-white shadow-sm transition-all ${
                           procesandoId === deuda.id ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"
@@ -163,11 +194,11 @@ export default function AprobacionesPage() {
                       </button>
                       
                       <button
-                        onClick={() => handleAccion(deuda, "rechazar")}
+                        onClick={() => abrirModalRechazo(deuda.id)}
                         disabled={procesandoId === deuda.id}
                         className={`w-full px-4 py-2 rounded font-medium text-red-700 bg-white hover:bg-red-50 border border-red-200 transition ${procesandoId === deuda.id && "opacity-50 cursor-not-allowed"}`}
                       >
-                        {procesandoId === deuda.id && accionSeleccionada === "rechazar" ? "Rechazando..." : "Rechazar Comprobante"}
+                        Rechazar Comprobante
                       </button>
                     </>
                   )
@@ -177,6 +208,43 @@ export default function AprobacionesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {modalRechazo.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md border-t-4 border-red-500">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Rechazar Operación</h3>
+            <p className="text-sm text-gray-600 mb-4">Indique el motivo del rechazo. Esta información será enviada a la empresa emisora para que corrija la carga.</p>
+            
+            <textarea
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 mb-4 resize-none outline-none"
+              rows={4}
+              placeholder="Ej: El monto en el PDF no coincide con lo declarado..."
+              value={motivoRechazo}
+              onChange={(e) => setMotivoRechazo(e.target.value)}
+              disabled={procesandoId === modalRechazo.deudaId}
+            ></textarea>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setModalRechazo({ isOpen: false, deudaId: null })}
+                className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded transition-colors"
+                disabled={procesandoId === modalRechazo.deudaId}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmarRechazo}
+                className={`px-4 py-2 rounded font-bold text-white transition-colors ${
+                  procesandoId === modalRechazo.deudaId ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                }`}
+                disabled={procesandoId === modalRechazo.deudaId}
+              >
+                {procesandoId === modalRechazo.deudaId ? "Procesando..." : "Confirmar Rechazo"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
