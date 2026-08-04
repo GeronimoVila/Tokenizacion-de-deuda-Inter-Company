@@ -149,6 +149,8 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
                 txhash_burn: true,
                 transaccion: {
                   select: {
+                    empresa_emisora_id: true,
+                    empresa_receptora_id: true,
                     empresa_emisora: { select: { nombre: true, cuit: true } },
                     empresa_receptora: { select: { nombre: true, cuit: true } }
                   }
@@ -218,20 +220,29 @@ export const auditarCierresPasivos = async (req: AuthRequest, res: Response): Pr
     const historialLiquidaciones = Array.from(liquidacionesMap.values());
 
     const resultadosEstandarizados = [
-      ...historialNetting.map(n => ({
-        id: `COMP-${n.id}`,
-        tipo: 'Netting Algorítmico',
-        fecha: n.fecha,
-        descripcion: n.descripcion,
-        operador: n.usuario_ejecutor?.name || n.usuario_ejecutor?.email || 'Sistema',
-        tokens_quemados: n.detalles.map(d => ({
-          id_token: d.token.token_id_blockchain,
-          txhash_burn: d.token.txhash_burn,
-          monto_saldado: d.monto_compensado.toString(),
-          acreedor: d.token.transaccion.empresa_emisora.nombre,
-          deudor: d.token.transaccion.empresa_receptora.nombre
-        }))
-      })),
+      ...historialNetting.map(n => {
+        const detallesPermitidos = n.detalles.filter(d => {
+          if (!usuario.rol_id || !rolesRestringidos.includes(usuario.rol_id)) return true;
+          
+          return d.token.transaccion.empresa_emisora_id === usuario.empresa_id || 
+                 d.token.transaccion.empresa_receptora_id === usuario.empresa_id;
+        });
+
+        return {
+          id: `COMP-${n.id}`,
+          tipo: 'Netting Algorítmico',
+          fecha: n.fecha,
+          descripcion: n.descripcion,
+          operador: n.usuario_ejecutor?.name || n.usuario_ejecutor?.email || 'Sistema',
+          tokens_quemados: detallesPermitidos.map(d => ({
+            id_token: d.token.token_id_blockchain,
+            txhash_burn: d.token.txhash_burn,
+            monto_saldado: d.monto_compensado.toString(),
+            acreedor: d.token.transaccion.empresa_emisora.nombre,
+            deudor: d.token.transaccion.empresa_receptora.nombre
+          }))
+        };
+      }).filter(n => n.tokens_quemados.length > 0),
       ...historialLiquidaciones
     ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 

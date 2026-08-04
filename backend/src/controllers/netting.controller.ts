@@ -13,11 +13,13 @@ export const simularNetting = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "No pertenecés a un Holding válido." });
     }
 
+    const rolesRestringidos = [3, 4, 5];
+
     console.log(`🧮 [Motor Netting] Calculando compensaciones y saldos para el Holding #${usuario.grupo_id}...`);
     
     let propuesta = await generarPropuestaNetting(usuario.grupo_id);
     
-    if (usuario.rol_id === 3) {
+    if (rolesRestringidos.includes(usuario.rol_id)) {
       propuesta = propuesta.filter(p => 
         p.empresaA_id === usuario.empresa_id || p.empresaB_id === usuario.empresa_id
       );
@@ -50,7 +52,7 @@ export const simularNetting = async (req: AuthRequest, res: Response) => {
       }
     });
 
-    if (usuario.rol_id === 3) {
+    if (rolesRestringidos.includes(usuario.rol_id)) {
       tokensActivos = tokensActivos.filter(token => 
         token.transaccion.empresa_emisora_id === usuario.empresa_id || 
         token.transaccion.empresa_receptora_id === usuario.empresa_id
@@ -111,6 +113,11 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
     const usuario = req.usuario;
     if (!usuario?.grupo_id) return res.status(403).json({ error: "No pertenecés a un Holding válido." });
 
+    const rolesRestringidos = [3, 4, 5];
+    if (rolesRestringidos.includes(usuario.rol_id)) {
+      return res.status(403).json({ error: "Acceso denegado. Solo la Administración del Holding puede ejecutar el Netting." });
+    }
+
     const propuesta = await generarPropuestaNetting(usuario.grupo_id);
     if (propuesta.length === 0) {
       return res.status(400).json({ error: "No hay deudas para compensar." });
@@ -140,7 +147,7 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
       console.log(`⏳ Verificando saldo y quemando tokens de ${empresaA.nombre}...`);
       const receipt1 = await ejecutarQuemaSegura(
         empresaA.wallet_address,
-        montoACompensar.toString(), // Conversión estricta a texto para proteger los decimales
+        montoACompensar.toString(), 
         usuario.email,
         `COMP-${compensacionDB.id}`
       );
@@ -148,14 +155,12 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
       console.log(`⏳ Verificando saldo y quemando tokens de ${empresaB.nombre}...`);
       const receipt2 = await ejecutarQuemaSegura(
         empresaB.wallet_address,
-        montoACompensar.toString(), // Conversión estricta a texto para proteger los decimales
+        montoACompensar.toString(), 
         usuario.email,
         `COMP-${compensacionDB.id}`
       );
 
-      // Transacción atómica en PostgreSQL ejecutada solo si la Blockchain confirma éxito
       await prisma.$transaction(async (txPrisma) => {
-
         const aplicarDescuento = async (tokens: any[], hashQuema: string) => {
           let restante = new Prisma.Decimal(montoACompensar.toString());
 
@@ -189,7 +194,6 @@ export const ejecutarNetting = async (req: AuthRequest, res: Response) => {
           }
         };
 
-        // Usamos los hashes criptográficos verificados que nos devolvió ejecutarQuemaSegura
         await aplicarDescuento(deudasA_B, receipt1.hash);
         await aplicarDescuento(deudasB_A, receipt2.hash);
       });
