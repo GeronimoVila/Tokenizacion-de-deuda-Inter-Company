@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { ArrowRightLeft, Flame, CheckCircle2, AlertCircle, Loader2, Building2, Scale } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface EmpresaInfo {
   id: number;
@@ -37,10 +43,10 @@ export default function NettingPage() {
   const { data: session } = useSession();
   const [oportunidades, setOportunidades] = useState<OportunidadCompensacion[]>([]);
   const [saldosGlobales, setSaldosGlobales] = useState<SaldoGlobal[]>([]);
-  
   const [isLoading, setIsLoading] = useState(true);
   const [procesando, setProcesando] = useState<number | null>(null);
   const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito"; texto: string } | null>(null);
+  const esAdministrador = session?.user?.rol_id === 1 || session?.user?.rol_id === 2;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -71,7 +77,7 @@ export default function NettingPage() {
 
   const handleEjecutarCompensacion = async (oportunidad: OportunidadCompensacion, index: number) => {
     const confirmacion = confirm(
-      `¿Confirma la compensación (quema) por $${oportunidad.montoACompensar} entre ${oportunidad.empresaA.nombre} y ${oportunidad.empresaB.nombre}?`
+      `¿Confirma la compensación (quema en blockchain) por $${oportunidad.montoACompensar} entre ${oportunidad.empresaA.nombre} y ${oportunidad.empresaB.nombre}? Esta acción es irreversible.`
     );
     
     if (!confirmacion) return;
@@ -98,7 +104,7 @@ export default function NettingPage() {
 
       setMensaje({ 
         tipo: "exito", 
-        texto: `¡Compensación exitosa! Se cruzaron saldos por $${oportunidad.montoACompensar} y los pagarés fueron actualizados en la Blockchain.` 
+        texto: `¡Compensación exitosa! Se cruzaron saldos por $${oportunidad.montoACompensar} y los pagarés fueron destruidos en la BFA.` 
       });
       
       cargarOportunidades();
@@ -110,152 +116,212 @@ export default function NettingPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-600">Calculando saldos cruzados y balances del Holding...</div>;
+  const formatearDinero = (monto: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2
+    }).format(monto);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="font-medium text-sm tracking-wide">Calculando saldos cruzados y balances del Holding...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Motor de Compensación (Netting)</h1>
-          <p className="text-gray-600 mt-1">Cruce automatizado de saldos para optimización de liquidez inter-company.</p>
-        </div>
-        <button 
-          onClick={cargarOportunidades}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded shadow-sm text-sm font-medium border border-gray-300"
-        >
-          🔄 Recalcular
-        </button>
+    <div className="max-w-7xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+          <Scale className="w-8 h-8 text-primary" />
+          Motor de compensación
+        </h1>
+        <p className="text-sm text-slate-500 mt-2">
+          Cruce automatizado de saldos para optimización de liquidez inter-company. Las deudas neteadas se queman permanentemente en la BFA.
+        </p>
       </div>
 
       {mensaje && (
-        <div className={`p-4 mb-6 rounded-lg ${mensaje.tipo === "error" ? "bg-red-50 text-red-700 border-l-4 border-red-500" : "bg-green-50 text-green-700 border-l-4 border-green-500"}`}>
-          {mensaje.texto}
-        </div>
+        <Alert 
+          variant={mensaje.tipo === "error" ? "destructive" : "default"} 
+          className={`mb-8 shadow-sm ${mensaje.tipo === "exito" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : ""}`}
+        >
+          {mensaje.tipo === "error" ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          )}
+          <AlertTitle className="font-bold">
+            {mensaje.tipo === "error" ? "Error de Procesamiento" : "Operación Web3 Exitosa"}
+          </AlertTitle>
+          <AlertDescription>{mensaje.texto}</AlertDescription>
+        </Alert>
       )}
 
-      {/* SECCIÓN 1: Tarjetas de Netting Operativo */}
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Oportunidades de Cruce Detectadas</h2>
-      {oportunidades.length === 0 ? (
-        <div className="bg-white border border-gray-200 p-8 text-center rounded-xl shadow-sm mb-8">
-          <div className="text-4xl mb-3">✅</div>
-          <h3 className="text-lg font-bold text-gray-800 mb-1">Cuentas Cruzadas Optimizadas</h3>
-          <p className="text-gray-500 text-sm">El algoritmo no detecta deudas cruzadas compensables en este momento.</p>
-        </div>
-      ) : (
-        <div className="grid gap-6 mb-8">
-          {oportunidades.map((op, index) => (
-            <div key={index} className="bg-white rounded-xl shadow-md border-t-4 border-t-blue-600 overflow-hidden">
-              <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100">
-                <div className="flex-1">
-                  <span className="text-xs font-bold tracking-wider text-blue-600 uppercase mb-2 block">Cruce Detectado</span>
-                  <div className="flex items-center gap-4 text-xl font-medium text-gray-800">
-                    <span className="bg-gray-100 px-3 py-1 rounded text-sm font-semibold">{op.empresaA.nombre}</span>
-                    <span className="text-gray-400">⟷</span>
-                    <span className="bg-gray-100 px-3 py-1 rounded text-sm font-semibold">{op.empresaB.nombre}</span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-sm text-gray-500 mb-1">Monto a Compensar (Ahorro)</p>
-                  <p className="text-3xl font-black text-green-600">
-                    $ {Number(op.montoACompensar).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-6 flex flex-col md:flex-row gap-8 text-sm">
-                {/* Deuda A hacia B */}
-                <div className="flex-1 bg-white p-4 rounded border border-gray-200 shadow-sm">
-                  <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">Deuda de {op.empresaA.nombre}</h4>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-600">Deuda Bruta Acumulada:</span>
-                    <span className="font-semibold text-red-600">${Number(op.deudaBruta_A_hacia_B).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-600">A cancelar por Netting:</span>
-                    <span className="font-semibold text-green-600">- ${Number(op.montoACompensar).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between mt-3 pt-2 border-t font-bold">
-                    <span>Saldo Remanente a Pagar:</span>
-                    <span className={Number(op.saldoNetoFinal_A_hacia_B) > 0 ? "text-orange-600" : "text-gray-500"}>
-                      ${Number(op.saldoNetoFinal_A_hacia_B).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Deuda B hacia A */}
-                <div className="flex-1 bg-white p-4 rounded border border-gray-200 shadow-sm">
-                  <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">Deuda de {op.empresaB.nombre}</h4>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-600">Deuda Bruta Acumulada:</span>
-                    <span className="font-semibold text-red-600">${Number(op.deudaBruta_B_hacia_A).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-600">A cancelar por Netting:</span>
-                    <span className="font-semibold text-green-600">- ${Number(op.montoACompensar).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between mt-3 pt-2 border-t font-bold">
-                    <span>Saldo Remanente a Pagar:</span>
-                    <span className={Number(op.saldoNetoFinal_B_hacia_A) > 0 ? "text-orange-600" : "text-gray-500"}>
-                      ${Number(op.saldoNetoFinal_B_hacia_A).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-white border-t text-right">
-                <button
-                  onClick={() => handleEjecutarCompensacion(op, index)}
-                  disabled={procesando === index}
-                  className={`px-8 py-3 rounded font-bold text-white shadow transition-all ${procesando === index ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"}`}
-                >
-                  {procesando === index ? "🔥 Ejecutando Netting en Web3..." : "Confirmar y Ejecutar Netting"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* SECCIÓN 2: Libro Mayor / Estado de Cuenta Consolidado */}
-      <div className="mt-12 mb-8">
-        <h2 className="text-2xl font-bold text-gray-800 border-b pb-2 mb-4">Estado de Cuenta Consolidado (Libro Mayor)</h2>
-        <p className="text-gray-600 mb-6">Detalle de todos los saldos activos en el Holding (Incluyendo deudas unilaterales y saldos remanentes).</p>
-
-        {saldosGlobales.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 p-6 text-center rounded-lg text-gray-500">
-            No hay saldos de deuda pendientes en todo el holding.
-          </div>
+      <div className="mb-12">
+        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <ArrowRightLeft className="w-5 h-5 text-slate-500" /> Oportunidades de cruce detectadas
+        </h2>
+        
+        {oportunidades.length === 0 ? (
+          <Card className="border-dashed border-2 shadow-none bg-slate-50/50">
+            <CardContent className="flex flex-col items-center justify-center p-12 text-slate-400">
+              <CheckCircle2 className="h-12 w-12 mb-4 text-emerald-500/50" />
+              <h3 className="text-lg font-semibold text-slate-900">Cuentas cruzadas optimizadas</h3>
+              <p className="text-sm mt-1 text-slate-500 text-center">El algoritmo no detecta deudas cruzadas compensables en este momento.</p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-800 text-white text-sm uppercase tracking-wider">
-                  <th className="p-4 font-medium">Empresa Acreedora (A favor de)</th>
-                  <th className="p-4 font-medium">Empresa Deudora (A pagar por)</th>
-                  <th className="p-4 font-medium text-right">Saldo Total Activo</th>
-                  <th className="p-4 font-medium text-center">Tokens Respaldatorios</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {saldosGlobales.map((saldo, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-bold text-gray-800">{saldo.acreedor}</td>
-                    <td className="p-4 text-gray-600">{saldo.deudor}</td>
-                    <td className="p-4 font-black text-blue-600 text-right">
-                      $ {Number(saldo.monto_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold border border-blue-200">
-                        {saldo.cantidad_tokens} Pagarés
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-6">
+            {oportunidades.map((op, index) => (
+              <Card key={index} className="shadow-sm border-t-4 border-t-primary overflow-hidden">
+                
+                <div className="bg-slate-900 p-6 flex flex-col md:flex-row justify-between md:items-center gap-6">
+                  <div>
+                    <Badge variant="outline" className="bg-primary/20 text-primary-foreground border-primary/30 uppercase text-[10px] font-bold tracking-widest mb-3">
+                      Cruce Detectado
+                    </Badge>
+                    <div className="flex flex-wrap items-center gap-3 text-xl font-black text-white">
+                      <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+                        <Building2 className="w-4 h-4 text-slate-400" /> {op.empresaA.nombre}
+                      </div>
+                      <ArrowRightLeft className="w-5 h-5 text-slate-500" />
+                      <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+                        <Building2 className="w-4 h-4 text-slate-400" /> {op.empresaB.nombre}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-left md:text-right bg-slate-800 p-4 rounded-lg border border-slate-700">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto a Compensar (Ahorro)</p>
+                    <p className="text-3xl font-black text-emerald-400">
+                      {formatearDinero(op.montoACompensar)}
+                    </p>
+                  </div>
+                </div>
+
+                <CardContent className="p-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50">
+                  
+                  <div className="p-6 md:p-8 space-y-4">
+                    <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2">Deuda de {op.empresaA.nombre}</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600 font-medium">Deuda Bruta Acumulada:</span>
+                        <span className="font-bold text-destructive">{formatearDinero(op.deudaBruta_A_hacia_B)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600 font-medium">A cancelar por Netting:</span>
+                        <span className="font-bold text-emerald-600">- {formatearDinero(op.montoACompensar)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                        <span className="font-bold text-slate-900">Saldo Remanente a Pagar:</span>
+                        <span className={`font-black text-lg ${Number(op.saldoNetoFinal_A_hacia_B) > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                          {formatearDinero(op.saldoNetoFinal_A_hacia_B)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 md:p-8 space-y-4">
+                    <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2">Deuda de {op.empresaB.nombre}</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600 font-medium">Deuda Bruta Acumulada:</span>
+                        <span className="font-bold text-destructive">{formatearDinero(op.deudaBruta_B_hacia_A)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600 font-medium">A cancelar por Netting:</span>
+                        <span className="font-bold text-emerald-600">- {formatearDinero(op.montoACompensar)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                        <span className="font-bold text-slate-900">Saldo Remanente a Pagar:</span>
+                        <span className={`font-black text-lg ${Number(op.saldoNetoFinal_B_hacia_A) > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                          {formatearDinero(op.saldoNetoFinal_B_hacia_A)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+
+                <div className="p-4 bg-white border-t border-slate-100 flex justify-end">
+                  {esAdministrador ? (
+                    <Button
+                      onClick={() => handleEjecutarCompensacion(op, index)}
+                      disabled={procesando !== null}
+                      size="lg"
+                      className="font-bold shadow-sm"
+                    >
+                      {procesando === index ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Quemando Tokens en Web3...</>
+                      ) : (
+                        <><Flame className="w-4 h-4 mr-2" /> Confirmar y Ejecutar Netting</>
+                      )}
+                    </Button>
+                  ) : (
+                    <p className="text-xs font-bold text-amber-600 bg-amber-50 px-4 py-2 rounded-md border border-amber-200">
+                      Solo la Administración Global puede ejecutar el Netting.
+                    </p>
+                  )}
+                </div>
+              </Card>
+            ))}
           </div>
         )}
+      </div>
+
+      <div>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-slate-500" /> Estado de cuenta consolidado
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Detalle de todos los saldos activos en el Holding (Incluyendo deudas unilaterales y saldos remanentes previos a la liquidación final).
+          </p>
+        </div>
+
+        <Card className="shadow-sm border-slate-200">
+          <CardContent className="p-0">
+            {saldosGlobales.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm font-medium">
+                No hay saldos de deuda pendientes en todo el holding.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-slate-900">
+                  <TableRow className="hover:bg-slate-900 border-b-0">
+                    <TableHead className="font-bold text-slate-300">Empresa acreedora</TableHead>
+                    <TableHead className="font-bold text-slate-300">Empresa deudora (A pagar por)</TableHead>
+                    <TableHead className="font-bold text-slate-300 text-right">Saldo total activo</TableHead>
+                    <TableHead className="font-bold text-slate-300 text-center">Tokens respaldatorios</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {saldosGlobales.map((saldo, idx) => (
+                    <TableRow key={idx} className="hover:bg-slate-50 transition-colors">
+                      <TableCell className="font-bold text-slate-900">{saldo.acreedor}</TableCell>
+                      <TableCell className="font-medium text-slate-600">{saldo.deudor}</TableCell>
+                      <TableCell className="font-black text-primary text-right text-lg">
+                        {formatearDinero(saldo.monto_total)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 font-bold">
+                          {saldo.cantidad_tokens} Pagaré{saldo.cantidad_tokens !== 1 ? 's' : ''}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
     </div>

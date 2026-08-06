@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { Loader2, AlertCircle, CheckCircle2, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DeudaFormData {
   empresaDeudoraId: number | "";
@@ -22,12 +29,24 @@ export default function CargarDeudaPage() {
   
   if (session?.user?.empresa_activa === false) {
     return (
-      <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-lg shadow-sm border border-gray-200 text-center">
-        <h1 className="text-2xl font-bold mb-4 text-gray-900">Acceso Restringido</h1>
-        <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-500 rounded text-left">
-          <p className="font-medium">Tu subsidiaria se encuentra inactiva.</p>
-          <p className="text-sm mt-1">Solo tienes acceso de lectura para visualizar la auditoría histórica de tus saldos pasados. No puedes registrar nuevas operaciones.</p>
-        </div>
+      <div className="flex justify-center mt-10">
+        <Card className="max-w-2xl w-full shadow-sm border-slate-200">
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="p-3 bg-amber-100 rounded-full">
+                <Lock className="h-8 w-8 text-amber-700" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Acceso Restringido</h1>
+            <Alert variant="destructive" className="bg-amber-50 text-amber-900 border-amber-200 text-left mt-4">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <AlertTitle className="text-amber-800 font-bold">Tu subsidiaria se encuentra inactiva.</AlertTitle>
+              <AlertDescription className="text-amber-700/90 mt-2">
+                Solo tienes acceso de lectura para visualizar la auditoría histórica de tus saldos pasados. No puedes registrar nuevas operaciones.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -69,12 +88,16 @@ export default function CargarDeudaPage() {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "empresaDeudoraId" || name === "monto" ? Number(value) : value,
+      [name]: name === "monto" ? Number(value) : value,
     }));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, empresaDeudoraId: Number(value) }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +105,7 @@ export default function CargarDeudaPage() {
       const file = e.target.files[0];
       
       if (file.type !== "application/pdf" || file.size > MAX_FILE_SIZE) {
-        setMensaje({ tipo: "error", texto: "Formato inválido o archivo demasiado pesado" });
+        setMensaje({ tipo: "error", texto: "Formato inválido o archivo demasiado pesado. Solo se permiten PDFs de hasta 5MB." });
         e.target.value = '';
         setFormData((prev) => ({ ...prev, comprobante: null }));
         return;
@@ -129,8 +152,9 @@ export default function CargarDeudaPage() {
         throw new Error(errorData.error || "Error al registrar la deuda.");
       }
 
-      setMensaje({ tipo: "exito", texto: "Operación registrada con éxito. Pendiente de aprobación." });
+      setMensaje({ tipo: "exito", texto: "Operación registrada con éxito. Pendiente de validación por la contraparte." });
       setFormData({ empresaDeudoraId: "", monto: "", concepto: "", comprobante: null });
+      
       const fileInput = document.getElementById("comprobante") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
 
@@ -143,92 +167,124 @@ export default function CargarDeudaPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Cargar Nueva Deuda</h1>
+    <div className="p-6 md:p-8">
+      <Card className="max-w-2xl mx-auto shadow-sm border-slate-200 bg-white">
+        <CardHeader className="border-b border-slate-100 pb-6 mb-6">
+          <CardTitle className="text-2xl font-bold text-slate-900 tracking-tight">
+            Cargar nueva deuda
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent>
+          {mensaje && (
+            <Alert 
+              variant={mensaje.tipo === "error" ? "destructive" : "default"} 
+              className={`mb-6 ${mensaje.tipo === "exito" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : ""}`}
+            >
+              {mensaje.tipo === "error" ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              )}
+              <AlertTitle className="font-bold">
+                {mensaje.tipo === "error" ? "Error de validación" : "Operación exitosa"}
+              </AlertTitle>
+              <AlertDescription>{mensaje.texto}</AlertDescription>
+            </Alert>
+          )}
 
-      {mensaje && (
-        <div className={`p-4 mb-6 rounded ${mensaje.tipo === "error" ? "bg-red-50 text-red-700 border-l-4 border-red-500" : "bg-green-50 text-green-700 border-l-4 border-green-500"}`}>
-          {mensaje.texto}
-        </div>
-      )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            <div className="space-y-2">
+              <Label htmlFor="empresaDeudoraId" className="text-slate-700 font-semibold">
+                Empresa deudora
+              </Label>
+              <Select 
+                onValueChange={handleSelectChange} 
+                value={formData.empresaDeudoraId.toString()} 
+                required
+              >
+                <SelectTrigger className="w-full bg-slate-50/50">
+                  <SelectValue placeholder="Seleccione una empresa..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {empresas.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>
+                      {emp.nombre} (ID: {emp.id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Empresa Deudora (Contraparte)
-          </label>
-          <select
-            name="empresaDeudoraId"
-            value={formData.empresaDeudoraId}
-            onChange={handleInputChange}
-            required
-            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="" disabled>Seleccione una empresa...</option>
-            {empresas.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.nombre} (ID: {emp.id})
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="monto" className="text-slate-700 font-semibold">
+                Monto (ARS)
+              </Label>
+              <Input
+                type="number"
+                id="monto"
+                name="monto"
+                value={formData.monto}
+                onChange={handleInputChange}
+                required
+                min="1.00"
+                step="1.00"
+                placeholder="0"
+                className="bg-slate-50/50 font-mono"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Monto (USD / ARS)
-          </label>
-          <input
-            type="number"
-            name="monto"
-            value={formData.monto}
-            onChange={handleInputChange}
-            required
-            min="0.01"
-            step="0.01"
-            placeholder="0.00"
-            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="concepto" className="text-slate-700 font-semibold">
+                Concepto / Referencia
+              </Label>
+              <Input
+                type="text"
+                id="concepto"
+                name="concepto"
+                value={formData.concepto}
+                onChange={handleInputChange}
+                required
+                placeholder="Ej. Factura A-0001-00004532 por servicios"
+                className="bg-slate-50/50"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Concepto / Referencia
-          </label>
-          <input
-            type="text"
-            name="concepto"
-            value={formData.concepto}
-            onChange={handleInputChange}
-            required
-            placeholder="Ej. Factura A-0001-00004532 por servicios"
-            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="comprobante" className="text-slate-700 font-semibold">
+                Comprobante de respaldatorio (Solo PDF)
+              </Label>
+              <Input
+                type="file"
+                id="comprobante"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                required
+                className="cursor-pointer bg-slate-50/50 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-900 hover:file:bg-slate-300"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Comprobante Respaldatorio (Solo PDF)
-          </label>
-          <input
-            type="file"
-            id="comprobante"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            required
-            className="w-full p-2 border border-gray-300 rounded file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-        </div>
-
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-2 px-4 border border-transparent rounded shadow-sm text-sm font-medium text-white ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            {isLoading ? "Registrando Operación..." : "Registrar Deuda"}
-          </button>
-        </div>
-      </form>
+            <div className="pt-2">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                size="lg"
+                className="w-full text-md font-bold tracking-wide"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Registrando Operación...
+                  </>
+                ) : (
+                  "Registrar deuda"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

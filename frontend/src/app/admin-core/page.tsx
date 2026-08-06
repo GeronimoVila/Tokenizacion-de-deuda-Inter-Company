@@ -2,6 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { Building, ShieldAlert, CheckCircle2, AlertCircle, Loader2, Power, PowerOff, Network } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface HoldingFormData {
   nombre: string;
@@ -73,7 +81,7 @@ export default function AdminCorePage() {
     setSuccessMsg(null);
 
     if (!formData.nombre || !formData.cuit || !formData.nombreAdmin || !formData.adminEmail) {
-      setError("Todos los campos son obligatorios.");
+      setError("Todos los campos son obligatorios para inicializar el entorno.");
       setIsLoading(false);
       return;
     }
@@ -155,181 +163,199 @@ export default function AdminCorePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-12">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-slate-800">Panel de Infraestructura (Sysadmin)</h1>
-        <p className="text-slate-500 mt-2">
-          Gestión del ecosistema. Desde aquí puedes aprovisionar nuevos holdings o suspender grupos empresariales enteros.
+    <div className="max-w-7xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+          <Network className="w-8 h-8 text-primary" />
+          Panel de Infraestructura
+        </h1>
+        <p className="text-sm text-slate-500 mt-2">
+          Gestión del ecosistema core. Desde aquí puedes aprovisionar nuevos holdings o suspender grupos empresariales enteros.
         </p>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-md text-sm font-medium">
-          {error}
-        </div>
-      )}
-      {successMsg && (
-        <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-r-md text-sm font-medium">
-          {successMsg}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50">
-          <h2 className="text-lg font-semibold text-slate-800">Inicializar Nuevo Holding</h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Datos de la Entidad</h3>
-              
-              <div>
-                <label htmlFor="nombre" className="block text-sm font-medium text-slate-700 mb-1">
-                  Razón Social del Grupo
-                </label>
-                <input
-                  type="text"
-                  id="nombre"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
-                  placeholder="Ej. Grupo Tech S.A."
-                />
-              </div>
-
-              <div>
-                <label htmlFor="cuit" className="block text-sm font-medium text-slate-700 mb-1">
-                  CUIT del Holding
-                </label>
-                <input
-                  type="text"
-                  id="cuit"
-                  name="cuit"
-                  value={formData.cuit}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
-                  placeholder="Sin guiones (Ej. 30123456789)"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cuenta Administrativa Inicial</h3>
-              
-              <div>
-                <label htmlFor="nombreAdmin" className="block text-sm font-medium text-slate-700 mb-1">
-                  Nombre del Administrador del Holding
-                </label>
-                <input
-                  type="text"
-                  id="nombreAdmin"
-                  name="nombreAdmin"
-                  value={formData.nombreAdmin}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
-                  placeholder="Nombre completo"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="adminEmail" className="block text-sm font-medium text-slate-700 mb-1">
-                  Correo Corporativo (Google Auth)
-                </label>
-                <input
-                  type="email"
-                  id="adminEmail"
-                  name="adminEmail"
-                  value={formData.adminEmail}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-black"
-                  placeholder="admin@grupotech.com"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 flex justify-end border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`px-6 py-2.5 rounded-lg text-white font-medium transition-all ${
-                isLoading 
-                  ? "bg-indigo-400 cursor-not-allowed" 
-                  : "bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow"
-              }`}
-            >
-              {isLoading ? "Provisionando..." : "Registrar Holding"}
-            </button>
-          </div>
-        </form>
+      <div className="mb-8 space-y-4">
+        {error && (
+          <Alert variant="destructive" className="shadow-sm">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="font-bold">Error de Infraestructura</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {successMsg && (
+          <Alert className="bg-emerald-50 text-emerald-900 border-emerald-200 shadow-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <AlertTitle className="font-bold">Operación Exitosa</AlertTitle>
+            <AlertDescription>{successMsg}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-800">Grupos Empresariales Registrados</h2>
-          {isFetching && <span className="text-sm text-slate-500">Actualizando...</span>}
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-white border-b border-slate-200 text-sm text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-4 font-medium">Razón Social</th>
-                <th className="px-6 py-4 font-medium">CUIT</th>
-                <th className="px-6 py-4 font-medium">Fecha Alta</th>
-                <th className="px-6 py-4 font-medium">Estado</th>
-                <th className="px-6 py-4 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+      <Card className="mb-8 shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800">Inicializar Nuevo Holding</CardTitle>
+          <CardDescription>
+            Provisiona un entorno corporativo aislado y asigna a su primer Administrador Global.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+
+              <div className="space-y-5">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                  <Building className="w-4 h-4" /> Datos de la Entidad
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nombre" className="text-slate-700 font-semibold">Razón Social del Grupo</Label>
+                    <Input
+                      type="text"
+                      id="nombre"
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleInputChange}
+                      className="bg-slate-50/50"
+                      placeholder="Ej. Grupo Tech S.A."
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cuit" className="text-slate-700 font-semibold">CUIT del Holding</Label>
+                    <Input
+                      type="text"
+                      id="cuit"
+                      name="cuit"
+                      value={formData.cuit}
+                      onChange={handleInputChange}
+                      className="bg-slate-50/50 font-mono text-sm"
+                      placeholder="Sin guiones (Ej. 30123456789)"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4" /> Cuenta Administrativa Inicial
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nombreAdmin" className="text-slate-700 font-semibold">Nombre del Administrador</Label>
+                    <Input
+                      type="text"
+                      id="nombreAdmin"
+                      name="nombreAdmin"
+                      value={formData.nombreAdmin}
+                      onChange={handleInputChange}
+                      className="bg-slate-50/50"
+                      placeholder="Nombre completo"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adminEmail" className="text-slate-700 font-semibold">Correo Corporativo (Google Auth)</Label>
+                    <Input
+                      type="email"
+                      id="adminEmail"
+                      name="adminEmail"
+                      value={formData.adminEmail}
+                      onChange={handleInputChange}
+                      className="bg-slate-50/50"
+                      placeholder="admin@grupotech.com"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                size="lg"
+                className="w-full md:w-auto font-bold shadow-sm"
+              >
+                {isLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Provisionando entorno...</>
+                ) : (
+                  "Registrar Holding"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-bold text-slate-800">Grupos Empresariales Registrados</CardTitle>
+          {isFetching && <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />}
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow>
+                <TableHead className="font-bold text-slate-600">Razón Social</TableHead>
+                <TableHead className="font-bold text-slate-600">CUIT</TableHead>
+                <TableHead className="font-bold text-slate-600">Fecha Alta</TableHead>
+                <TableHead className="font-bold text-slate-600 text-center">Estado</TableHead>
+                <TableHead className="font-bold text-slate-600 text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {holdings.length === 0 && !isFetching ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                    No hay grupos empresariales registrados en el sistema.
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-400">
+                      <Network className="h-8 w-8 mb-3 text-slate-300" />
+                      <span className="text-sm font-semibold text-slate-900">Infraestructura vacía</span>
+                      <span className="text-sm mt-1">No hay grupos empresariales aprovisionados en el sistema.</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ) : (
                 holdings.map((holding) => (
-                  <tr key={holding.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-800">
-                      {holding.nombre}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{holding.cuit}</td>
-                    <td className="px-6 py-4 text-slate-600">
+                  <TableRow key={holding.id} className={`transition-colors ${!holding.activo ? "bg-slate-50/50 opacity-80" : "hover:bg-slate-50/50"}`}>
+                    <TableCell className="font-bold text-slate-900">{holding.nombre}</TableCell>
+                    <TableCell className="font-mono text-sm text-slate-600">{holding.cuit}</TableCell>
+                    <TableCell className="text-sm text-slate-500">
                       {new Date(holding.fecha_creacion).toLocaleDateString("es-AR")}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          holding.activo
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={holding.activo ? "outline" : "secondary"} className={holding.activo ? "bg-emerald-50 text-emerald-700 border-emerald-200 uppercase text-[10px] font-bold tracking-wider" : "uppercase text-[10px] font-bold tracking-wider"}>
                         {holding.activo ? "Activo" : "Suspendido"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
                         onClick={() => toggleHoldingStatus(holding.id, holding.activo)}
-                        className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
-                          holding.activo
-                            ? "text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200"
-                            : "text-green-600 hover:bg-green-50 border border-transparent hover:border-green-200"
-                        }`}
+                        className={`font-semibold ${holding.activo ? 'text-rose-600 hover:text-rose-900 hover:bg-rose-50' : 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-50'}`}
                       >
-                        {holding.activo ? "Desactivar" : "Reactivar"}
-                      </button>
-                    </td>
-                  </tr>
+                        {holding.activo ? (
+                          <><PowerOff className="w-4 h-4 mr-1.5" /> Desactivar</>
+                        ) : (
+                          <><Power className="w-4 h-4 mr-1.5" /> Reactivar</>
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

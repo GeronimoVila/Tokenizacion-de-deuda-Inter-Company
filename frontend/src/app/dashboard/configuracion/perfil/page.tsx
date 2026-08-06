@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface PerfilData {
   nombre: string;
@@ -27,7 +33,7 @@ export default function ConfiguracionPerfilPage() {
     if (session?.user?.email && (rolId === 2 || rolId === 3)) {
       cargarPerfil();
     }
-  }, [session]);
+  }, [session, rolId]);
 
   const cargarPerfil = async () => {
     try {
@@ -79,7 +85,7 @@ export default function ConfiguracionPerfilPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Error al actualizar los datos.");
 
-      setSuccess(data.mensaje);
+      setSuccess(data.mensaje || "Datos actualizados correctamente.");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -89,96 +95,143 @@ export default function ConfiguracionPerfilPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex h-[60vh] items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
 
   if (rolId !== 2 && rolId !== 3) {
-    return <div className="p-8 text-red-600 font-medium">No posees permisos para acceder a esta configuración.</div>;
+    return (
+      <div className="max-w-4xl mx-auto p-6 md:p-8 mt-10">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Acceso Denegado</AlertTitle>
+          <AlertDescription>No posees permisos de administración para acceder a la configuración de este entorno.</AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">
-          Configuración de {tipoPerfil === "HOLDING" ? "Grupo Empresarial" : "Unidad de Negocio"}
+    <div className="max-w-5xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+          Configuración de {tipoPerfil === "HOLDING" ? "Grupo Empresarial" : "unidad de negocio"}
         </h1>
-        <p className="text-slate-500 mt-2">
+        <p className="text-sm text-slate-500 mt-2">
           Actualiza los datos estructurales y de infraestructura Web3 de tu entidad.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          
-          {error && <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm font-medium">{error}</div>}
-          {success && <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 text-sm font-medium">{success}</div>}
+      <Card className="shadow-sm border-slate-200">
+        <CardContent className="p-0">
+          <form onSubmit={handleSubmit}>
+            
+            <div className="px-6 md:px-8 pt-8">
+              {error && (
+                <Alert variant="destructive" className="mb-6">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle className="font-bold">Error al guardar</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              {success && (
+                <Alert className="mb-6 bg-emerald-50 text-emerald-900 border-emerald-200">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <AlertTitle className="font-bold">Operación Exitosa</AlertTitle>
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-5">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Datos Fiscales</h3>
+            <div className="px-6 md:px-8 pb-8 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
               
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Razón Social / Nombre</label>
-                <input
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                />
+              <div className="space-y-6">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  Datos Fiscales
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nombre" className="text-slate-700 font-semibold">Razón social / Nombre</Label>
+                    <Input
+                      type="text"
+                      id="nombre"
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleInputChange}
+                      required
+                      disabled={isSaving}
+                      className="bg-slate-50/50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cuit" className="text-slate-700 font-semibold">CUIT</Label>
+                    <Input
+                      type="text"
+                      id="cuit"
+                      name="cuit"
+                      value={formData.cuit}
+                      onChange={handleInputChange}
+                      required
+                      disabled={isSaving}
+                      className="bg-slate-50/50 font-mono text-sm"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">CUIT</label>
-                <input
-                  type="text"
-                  name="cuit"
-                  value={formData.cuit}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                />
+              <div className="space-y-6">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  Infraestructura Web3
+                </h3>
+                
+                {tipoPerfil === "SUBSIDIARIA" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="wallet_address" className="text-slate-700 font-semibold">Dirección de billetera (BFA)</Label>
+                    <Input
+                      type="text"
+                      id="wallet_address"
+                      name="wallet_address"
+                      value={formData.wallet_address}
+                      onChange={handleInputChange}
+                      placeholder="0x..."
+                      disabled={isSaving}
+                      className="bg-slate-50/50 font-mono text-sm"
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-1">
+                      Esta Wallet se utilizará para la emisión (Mint) y destrucción (Burn) de los tokens representativos de deuda.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center bg-slate-50/50 border border-dashed border-slate-200 rounded-md p-6">
+                    <p className="text-xs text-slate-500 text-center">
+                      El perfil de Holding no requiere configuración de billetera Web3 para operaciones directas.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Módulo Web3 exclusivo para Subsidiarias */}
-            {tipoPerfil === "SUBSIDIARIA" && (
-              <div className="space-y-5">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Infraestructura Web3</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Dirección de Billetera (BFA)</label>
-                  <input
-                    type="text"
-                    name="wallet_address"
-                    value={formData.wallet_address}
-                    onChange={handleInputChange}
-                    placeholder="0x..."
-                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors font-mono text-sm"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">Esta Wallet se utilizará para la emisión (Mint) y destrucción (Burn) de los tokens representativos de deuda.</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="pt-6 flex justify-end border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className={`px-6 py-2.5 rounded-lg text-white font-medium transition-all ${
-                isSaving ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 shadow-sm"
-              }`}
-            >
-              {isSaving ? "Guardando cambios..." : "Guardar Cambios"}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="bg-slate-50 px-6 md:px-8 py-5 border-t border-slate-100 flex justify-end">
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="w-full md:w-auto font-bold shadow-sm"
+              >
+                {isSaving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...</>
+                ) : (
+                  "Guardar cambios"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

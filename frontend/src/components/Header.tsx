@@ -1,6 +1,10 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
+import { LogOut, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 export default function Header() {
   const { data: session } = useSession();
@@ -9,34 +13,75 @@ export default function Header() {
     await signOut({ callbackUrl: "/" });
   };
 
+  const getRoleName = (rolId?: number) => {
+    if (!rolId) return "OPERADOR";
+    if ([1, 2, 3].includes(rolId)) return "ADMINISTRADOR";
+    if (rolId === 5) return "AUDITOR";
+    return "OPERADOR";
+  };
+
+  const userRole = getRoleName(session?.user?.rol_id);
+  const userName = session?.user?.name || "Usuario";
+  
+  const initials = userName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
   return (
-    <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-      <div className="flex items-center">
-        <h2 className="text-lg font-medium text-gray-800">Panel de Control</h2>
+    <header className="sticky top-0 z-40 flex h-24 min-h-20 w-full items-center justify-between border-b bg-background/95 px-8 backdrop-blur supports-backdrop-filter:bg-background/60">
+      
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-lg">
+          TD
+        </div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground hidden sm:block">
+          Tokenización de deuda
+        </h2>
       </div>
       
-      <div className="flex items-center space-x-4">
-        <div className="flex flex-col text-right">
-          <span className="text-sm font-semibold text-gray-900">
-            {session?.user?.name || "Usuario"}
-          </span>
-          <span className="text-xs text-gray-500">
-            {session?.user?.email}
-          </span>
-        </div>
+      <div className="flex items-center">
         
-        <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
-          {session?.user?.name?.charAt(0).toUpperCase() || "U"}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-14 w-auto flex items-center gap-3 rounded-full hover:bg-muted/50 px-3">
+              <div className="hidden flex-col items-end sm:flex">
+                <span className="text-base font-bold leading-none text-foreground">{userName}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1.5">
+                  {userRole}
+                </span>
+              </div>
+              <Avatar className="h-10 w-10 border border-border">
+                <AvatarFallback className="bg-primary/10 text-primary font-bold tracking-widest">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            </Button>
+          </DropdownMenuTrigger>
+          
+          <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none text-foreground">{userName}</p>
+                <p className="text-xs leading-none text-muted-foreground">{session?.user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            
+            <DropdownMenuSeparator />
 
-        <div className="pl-4 border-l border-gray-300">
-          <button
-            onClick={handleLogout}
-            className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
-          >
-            Cerrar sesión
-          </button>
-        </div>
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer font-medium"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Cerrar sesión</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
       </div>
     </header>
   );

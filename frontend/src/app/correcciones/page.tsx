@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { AlertCircle, CheckCircle2, Loader2, FileText, FileEdit, RefreshCw, XCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Empresa {
   id: number;
@@ -97,138 +106,222 @@ export default function CorreccionesPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500 font-medium">Buscando correcciones pendientes...</div>;
+  const formatearDinero = (monto: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2
+    }).format(monto);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="font-medium text-sm tracking-wide">Buscando correcciones pendientes...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-2 text-gray-800">Bandeja de Correcciones</h1>
-      <p className="text-gray-600 mb-6">Revisa los motivos de rechazo, corrige los comprobantes y reenvía las obligaciones a tus contrapartes.</p>
+    <div className="max-w-5xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mb-2">Bandeja de correcciones</h1>
+        <p className="text-sm text-slate-500">Revisa los motivos de rechazo, corrige los comprobantes y reenvía las obligaciones a tus contrapartes.</p>
+      </div>
 
       {mensaje && !deudaEditar && (
-        <div className={`p-4 mb-6 rounded-lg ${mensaje.tipo === "error" ? "bg-red-50 text-red-700 border-l-4 border-red-500" : "bg-green-50 text-green-700 border-l-4 border-green-500"}`}>
-          {mensaje.texto}
-        </div>
+        <Alert 
+          variant={mensaje.tipo === "error" ? "destructive" : "default"} 
+          className={`mb-6 shadow-sm ${mensaje.tipo === "exito" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : ""}`}
+        >
+          {mensaje.tipo === "error" ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          )}
+          <AlertTitle className="font-bold">
+            {mensaje.tipo === "error" ? "Atención" : "Operación Exitosa"}
+          </AlertTitle>
+          <AlertDescription>{mensaje.texto}</AlertDescription>
+        </Alert>
       )}
 
       {rechazadas.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 p-8 text-center rounded-lg text-gray-500">
-          No tienes transacciones devueltas o rechazadas en este momento.
-        </div>
+        <Card className="border-dashed border-2 shadow-none bg-slate-50/50">
+          <CardContent className="flex flex-col items-center justify-center p-12 text-slate-400">
+            <CheckCircle2 className="h-12 w-12 mb-4 text-slate-300" />
+            <h3 className="text-lg font-semibold text-slate-900">Bandeja limpia</h3>
+            <p className="text-sm mt-1 text-slate-500 text-center">No tienes transacciones devueltas o rechazadas en este momento.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           {rechazadas.map((deuda) => {
             const motivoExtraido = deuda.detalle.split(" | MOTIVO RECHAZO: ")[1] || "Sin motivo especificado por el operador.";
             
             return (
-              <div key={deuda.id} className="p-5 rounded-lg shadow-sm border border-red-200 bg-red-50">
-                <div className="flex flex-col md:flex-row justify-between gap-4">
-                  <div className="flex-1">
-                    <span className="bg-red-200 text-red-800 text-xs px-2 py-1 rounded font-bold uppercase tracking-wide mb-2 inline-block">Devuelto por contraparte</span>
-                    <h3 className="text-xl font-black text-gray-800">Operación #{deuda.id}</h3>
-                    <p className="text-sm text-gray-700 mt-1"><strong>Destinatario:</strong> {deuda.empresa_receptora.nombre}</p>
-                    <p className="text-sm text-gray-700"><strong>Monto original:</strong> ${Number(deuda.monto).toLocaleString('es-AR')}</p>
+              <Card key={deuda.id} className="shadow-sm border-destructive/20 bg-destructive/5 overflow-hidden transition-all hover:shadow-md">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row justify-between gap-6">
                     
-                    <div className="mt-3 p-3 bg-white border border-red-100 rounded text-sm text-gray-800">
-                      <span className="font-bold text-red-700">Motivo del rechazo:</span> {motivoExtraido}
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="destructive" className="font-bold uppercase tracking-widest text-[10px] px-2.5 py-0.5">
+                          Devuelto por contraparte
+                        </Badge>
+                      </div>
+                      
+                      <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+                        Operación #{deuda.id}
+                      </h3>
+                      
+                      <div className="text-sm text-slate-700 space-y-1.5 pt-1">
+                        <p><span className="font-semibold text-slate-900">Destinatario:</span> {deuda.empresa_receptora.nombre}</p>
+                        <p><span className="font-semibold text-slate-900">Monto original:</span> {formatearDinero(deuda.monto)}</p>
+                      </div>
+
+                      <Alert variant="destructive" className="bg-background border-destructive/20 mt-4">
+                        <XCircle className="h-4 w-4" />
+                        <AlertTitle className="font-bold text-sm">Motivo del rechazo</AlertTitle>
+                        <AlertDescription className="text-sm mt-1 text-slate-700">
+                          {motivoExtraido}
+                        </AlertDescription>
+                      </Alert>
+                      
+                      <div className="pt-2">
+                        <a 
+                          href={deuda.url_documento_respaldo} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center text-sm font-bold text-slate-600 hover:underline hover:text-slate-900 transition-colors"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Revisar PDF original
+                        </a>
+                      </div>
                     </div>
 
-                    <a href={deuda.url_documento_respaldo} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline mt-3 inline-flex items-center gap-1 font-bold">
-                      📄 Revisar PDF Original
-                    </a>
+                    <div className="flex flex-col gap-3 min-w-60 justify-center border-t md:border-t-0 md:border-l border-destructive/10 pt-6 md:pt-0 md:pl-8">
+                      {session?.user?.empresa_activa === false ? (
+                        <div className="bg-destructive/10 text-destructive text-sm font-bold px-4 py-3 rounded-md border border-destructive/20 text-center">
+                          Subsidiaria Inactiva (Solo lectura)
+                        </div>
+                      ) : (
+                        <Button 
+                          onClick={() => abrirEditor(deuda)}
+                          variant="destructive"
+                          className="w-full font-bold shadow-sm h-12 text-sm"
+                        >
+                          <FileEdit className="w-4 h-4 mr-2" />
+                          Corregir y reenviar
+                        </Button>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="flex flex-col justify-center min-w-48">
-                    {session?.user?.empresa_activa === false ? (
-                      <span className="text-sm text-red-600 font-bold bg-red-100 px-4 py-3 rounded text-center">Solo Lectura</span>
-                    ) : (
-                      <button
-                        onClick={() => abrirEditor(deuda)}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm"
-                      >
-                        Corregir y Reenviar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {deudaEditar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl border-t-4 border-blue-600">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Corregir Operación #{deudaEditar.id}</h3>
-              <button onClick={() => setDeudaEditar(null)} disabled={isSubmitting} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
-            </div>
-            
-            {mensaje && (
-              <div className="p-3 mb-4 rounded bg-red-50 text-red-700 text-sm border-l-4 border-red-500">{mensaje.texto}</div>
+      <Dialog 
+        open={!!deudaEditar} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isSubmitting) setDeudaEditar(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-150 p-0 overflow-hidden border-t-4 border-t-primary">
+          <div className="p-6">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-xl font-bold text-slate-900">
+                Corregir Operación #{deudaEditar?.id}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-slate-500 pt-1">
+                Ajusta los montos, el concepto o adjunta un nuevo comprobante para subsanar el rechazo.
+              </DialogDescription>
+            </DialogHeader>
+
+            {mensaje && deudaEditar && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle className="font-bold">Error de validación</AlertTitle>
+                <AlertDescription>{mensaje.texto}</AlertDescription>
+              </Alert>
             )}
 
-            <form onSubmit={handleReenviar} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Monto Corregido ($)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={nuevoMonto} 
-                  onChange={(e) => setNuevoMonto(e.target.value)} 
-                  required 
-                  disabled={isSubmitting}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none" 
-                />
+            <form onSubmit={handleReenviar} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="nuevoMonto" className="text-slate-700 font-semibold">Monto Corregido (ARS)</Label>
+                  <Input
+                    type="number"
+                    id="nuevoMonto"
+                    step="0.01"
+                    min="0.01"
+                    value={nuevoMonto}
+                    onChange={(e) => setNuevoMonto(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    className="font-mono bg-slate-50/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nuevoArchivo" className="text-slate-700 font-semibold">Nuevo Comprobante (Opcional)</Label>
+                  <Input
+                    type="file"
+                    id="nuevoArchivo"
+                    accept="application/pdf"
+                    onChange={(e) => setNuevoArchivo(e.target.files ? e.target.files[0] : null)}
+                    disabled={isSubmitting}
+                    className="cursor-pointer bg-slate-50/50 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-900 hover:file:bg-slate-300"
+                  />
+                  <p className="text-[11px] text-muted-foreground pt-1">Sube un PDF solo si el anterior fue rechazado por ilegibilidad.</p>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="nuevoDetalle" className="text-slate-700 font-semibold">Detalle / Concepto</Label>
+                  <Textarea
+                    id="nuevoDetalle"
+                    value={nuevoDetalle}
+                    onChange={(e) => setNuevoDetalle(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    className="resize-none min-h-20 bg-slate-50/50"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nuevo Comprobante PDF (Opcional)</label>
-                <input 
-                  type="file" 
-                  accept="application/pdf" 
-                  onChange={(e) => setNuevoArchivo(e.target.files ? e.target.files[0] : null)} 
-                  disabled={isSubmitting}
-                  className="w-full p-2 border border-gray-300 rounded text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                />
-                <p className="text-xs text-gray-500 mt-1">Solo sube un archivo si el anterior fue rechazado por ser ilegible o incorrecto.</p>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-1">Detalle / Concepto</label>
-                <textarea 
-                  value={nuevoDetalle} 
-                  onChange={(e) => setNuevoDetalle(e.target.value)} 
-                  required 
-                  disabled={isSubmitting}
-                  className="w-full p-2 border border-gray-300 rounded resize-none focus:ring-blue-500 outline-none" 
-                  rows={2}
-                ></textarea>
-              </div>
-
-              <div className="md:col-span-2 flex justify-end gap-3 mt-4">
-                <button 
+              <DialogFooter className="gap-3 sm:gap-0 pt-4 border-t border-slate-100">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setDeudaEditar(null)}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded"
+                  className="font-semibold text-slate-600 hover:text-slate-900"
                 >
                   Cancelar
-                </button>
-                <button 
+                </Button>
+                <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`px-6 py-2 rounded font-bold text-white transition-all flex items-center gap-2 ${
-                    isSubmitting ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
+                  className="font-bold shadow-sm"
                 >
-                  {isSubmitting ? "Procesando..." : "Confirmar y Reenviar"}
-                </button>
-              </div>
+                  {isSubmitting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4 mr-2" /> Confirmar y reenviar</>
+                  )}
+                </Button>
+              </DialogFooter>
             </form>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

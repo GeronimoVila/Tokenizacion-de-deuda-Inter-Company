@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { CierrePasivoHistorial } from "@/types/auditoria.types";
-import Link from "next/link";
+import { Copy, Loader2, Network, ShieldCheck, ArrowRightLeft } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface TokenDetalle {
   id_cierre: string;
@@ -72,7 +75,6 @@ export default function AuditoriaCierresPage() {
 
   const copiarAlPortapapeles = (texto: string) => {
     navigator.clipboard.writeText(texto);
-    alert("Hash copiado al portapapeles. Listo para verificar en el explorador de la BFA.");
   };
 
   const formatearFecha = (fechaString: string) => {
@@ -166,35 +168,40 @@ export default function AuditoriaCierresPage() {
     return Math.abs(valor).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">
-            {isGlobalAdmin ? "Consolidado Global de Compensaciones" : "Estado de Cuenta Consolidado"}
-          </h1>
-          <p className="text-slate-500 mt-2">
-            Resumen de saldos compensados inalterables {isGlobalAdmin ? "entre todas las filiales del Holding" : "por contraparte comercial"}.
-          </p>
-        </div>
-        <div className="mt-4 md:mt-0 flex shrink-0">
-          <Link 
-            href="/dashboard/auditoria" 
-            className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            Volver a Auditoría Web3
-          </Link>
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="font-medium text-sm tracking-wide">Recuperando registros inalterables...</div>
         </div>
       </div>
+    );
+  }
 
-      {error && <div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-md">{error}</div>}
+  return (
+    <div className="max-w-7xl mx-auto p-6 md:p-8 font-sans bg-background min-h-screen">
+      
+      <div className="mb-8 w-full">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+          {isGlobalAdmin ? "Consolidado Global de Compensaciones" : "Estado de cuenta consolidado"}
+        </h1>
+        <p className="text-sm text-slate-500 mt-2">
+          Resumen de saldos compensados inalterables {isGlobalAdmin ? "entre todas las filiales del Holding" : "por contraparte comercial"}.
+        </p>
+      </div>
+
+      {error && <div className="p-4 mb-6 bg-destructive/10 border-l-4 border-destructive text-destructive rounded-md font-medium text-sm">{error}</div>}
 
       <div className="space-y-8">
         {consolidados.length === 0 && !isLoading && (
-          <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
-            No se encontraron registros consolidados.
-          </div>
+          <Card className="border-dashed border-2 shadow-none bg-slate-50/50">
+            <CardContent className="flex flex-col items-center justify-center p-12 text-slate-400">
+              <Network className="h-12 w-12 mb-4 text-slate-300" />
+              <h3 className="text-lg font-semibold text-slate-900">Sin compensaciones</h3>
+              <p className="text-sm mt-1 text-slate-500 text-center">No se encontraron registros de tokens quemados por compensación algorítmica.</p>
+            </CardContent>
+          </Card>
         )}
 
         {consolidados.map((consolidado) => {
@@ -202,82 +209,98 @@ export default function AuditoriaCierresPage() {
           const saldoEsNegativo = consolidado.saldo_neto_cents < BigInt(0);
           
           return (
-            <div key={consolidado.id_agrupacion} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-slate-800 px-6 py-5 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
-                <div>
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            <Card key={consolidado.id_agrupacion} className="shadow-sm border-slate-200 overflow-hidden">
+              
+              <div className="bg-slate-900 px-6 py-5 flex flex-row items-center justify-between gap-8 overflow-x-auto scrollbar-hide whitespace-nowrap">
+                <div className="flex flex-col shrink-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                     {isGlobalAdmin ? "Par Comercial" : "Subsidiaria Contraparte"}
                   </span>
-                  <h3 className="text-2xl font-black text-white mt-1">{consolidado.contraparte_nombre}</h3>
+                  <h3 className="text-2xl font-black text-white tracking-tight">{consolidado.contraparte_nombre}</h3>
                 </div>
                 
-                <div className="flex gap-4">
-                  <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600/50">
-                    <p className="text-xs text-slate-400 uppercase font-semibold">
+                <div className="flex flex-row items-center gap-4 shrink-0">
+                  <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
                       {isGlobalAdmin ? `Deuda Bruta de ${consolidado.empresa_b_nombre}` : "Total a Favor (Cobrado)"}
                     </p>
                     <p className="text-lg font-bold text-emerald-400">${formatearMoneda(consolidado.total_a_favor_cents)}</p>
                   </div>
-                  <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600/50">
-                    <p className="text-xs text-slate-400 uppercase font-semibold">
+                  
+                  <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
                       {isGlobalAdmin ? `Deuda Bruta de ${consolidado.empresa_a_nombre}` : "Total en Contra (Pagado)"}
                     </p>
                     <p className="text-lg font-bold text-rose-400">${formatearMoneda(consolidado.total_en_contra_cents)}</p>
                   </div>
-                  <div className={`p-3 rounded-lg border ${saldoEsPositivo ? 'bg-emerald-900/40 border-emerald-500/50' : saldoEsNegativo ? 'bg-rose-900/40 border-rose-500/50' : 'bg-slate-700/50 border-slate-600/50'}`}>
-                    <p className="text-xs text-slate-300 uppercase font-semibold">Diferencia Histórica</p>
-                    <p className={`text-xl font-black ${saldoEsPositivo ? 'text-emerald-400' : saldoEsNegativo ? 'text-rose-400' : 'text-slate-300'}`}>
+                  
+                  <div className={`p-3 rounded-lg border ${saldoEsPositivo ? 'bg-emerald-950/40 border-emerald-500/30' : saldoEsNegativo ? 'bg-rose-950/40 border-rose-500/30' : 'bg-slate-800/80 border-slate-700'}`}>
+                    <p className="text-[10px] text-slate-300 uppercase font-bold tracking-wider mb-1">Diferencia Histórica</p>
+                    <p className={`text-xl font-black tracking-tight ${saldoEsPositivo ? 'text-emerald-400' : saldoEsNegativo ? 'text-rose-400' : 'text-slate-300'}`}>
                       {saldoEsNegativo && "-"}${formatearMoneda(consolidado.saldo_neto_cents)}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="p-6">
-                <h4 className="text-sm font-bold text-slate-700 mb-4 border-b pb-2">Desglose de Operaciones</h4>
-                <div className="space-y-3">
+              <CardContent className="p-6">
+                <h4 className="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3 flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-slate-500" /> Desglose de operaciones
+                </h4>
+                
+                <div className="space-y-4">
                   {consolidado.detalles.map((detalle, idx) => (
-                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex flex-col xl:flex-row justify-between gap-4 hover:bg-slate-100 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${detalle.es_a_favor ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-5 flex flex-col xl:flex-row justify-between gap-6 hover:bg-slate-100/50 transition-colors">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Badge variant={detalle.es_a_favor ? "outline" : "destructive"} className={detalle.es_a_favor ? "bg-emerald-50 text-emerald-700 border-emerald-200 uppercase text-[10px] font-bold tracking-wider" : "uppercase text-[10px] font-bold tracking-wider"}>
                             {isGlobalAdmin 
-                              ? (detalle.es_a_favor ? `Deuda a favor de ${consolidado.empresa_a_nombre}` : `Deuda a favor de ${consolidado.empresa_b_nombre}`)
+                              ? (detalle.es_a_favor ? `A favor de ${consolidado.empresa_a_nombre}` : `A favor de ${consolidado.empresa_b_nombre}`)
                               : (detalle.es_a_favor ? 'A Favor' : 'En Contra')
                             }
-                          </span>
-                          <span className="text-sm font-bold text-slate-600">ID: #{detalle.id_token}</span>
+                          </Badge>
+                          <span className="text-xs font-mono font-bold text-slate-500">ID: #{detalle.id_token}</span>
                         </div>
-                        <p className="text-sm font-medium text-slate-800">
-                          Monto Compensado: ${Number(detalle.monto).toLocaleString('es-AR')} ARS
+                        
+                        <p className="text-base font-bold text-slate-900">
+                          Monto compensado: <span className="font-black">${Number(detalle.monto).toLocaleString('es-AR')} ARS</span>
                         </p>
-                        <div className="mt-1 text-xs text-slate-500">
-                          <p><span className="font-semibold text-slate-400 uppercase">Ejecución:</span> {detalle.tipo} ({detalle.id_cierre})</p>
-                          <p><span className="font-semibold text-slate-400 uppercase">Fecha:</span> {formatearFecha(detalle.fecha)}</p>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 bg-white p-3 rounded border border-slate-100">
+                          <p><span className="font-bold text-slate-400 uppercase tracking-wider mr-2">Ejecución:</span> {detalle.tipo} ({detalle.id_cierre})</p>
+                          <p><span className="font-bold text-slate-400 uppercase tracking-wider mr-2">Fecha:</span> {formatearFecha(detalle.fecha)}</p>
                           {isGlobalAdmin && (
-                            <p className="mt-1">
-                              <span className="font-semibold text-slate-400 uppercase">Detalle:</span> Emitido por <strong>{detalle.acreedor_nombre}</strong> hacia <strong>{detalle.deudor_nombre}</strong>
+                            <p className="sm:col-span-2 mt-1 pt-2 border-t border-slate-50">
+                              <span className="font-bold text-slate-400 uppercase tracking-wider mr-2">Detalle:</span> Emitido por <strong>{detalle.acreedor_nombre}</strong> hacia <strong>{detalle.deudor_nombre}</strong>
                             </p>
                           )}
                         </div>
                       </div>
                       
-                      <div className="flex-1 bg-white border border-slate-200 rounded p-3 self-center xl:max-w-md w-full">
-                        <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Evidencia de Quema (BFA)</p>
-                        <div className="flex items-center bg-slate-50 p-2 rounded border border-slate-100">
-                          <p className="text-xs font-mono text-slate-600 truncate mr-2" title={detalle.txhash_burn}>
+                      <div className="flex-1 bg-white border border-slate-200 rounded-lg p-4 self-center xl:max-w-md w-full shadow-sm">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Evidencia de Quema (BFA)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-mono font-medium text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-2 rounded-md truncate w-full" title={detalle.txhash_burn}>
                             {detalle.txhash_burn}
                           </p>
-                          <button onClick={() => copiarAlPortapapeles(detalle.txhash_burn)} className="text-slate-400 hover:text-indigo-600 transition-colors shrink-0" title="Copiar Hash de Quema">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                          </button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => copiarAlPortapapeles(detalle.txhash_burn)} 
+                            className="h-8 w-8 text-slate-400 hover:text-primary shrink-0" 
+                            title="Copiar Hash de Quema"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>

@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { AlertCircle, CheckCircle2, Loader2, FileText, Landmark, Wallet, ArrowRightLeft, AlertTriangle, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface SaldoGlobal {
   deudor_id: number;
@@ -37,14 +46,11 @@ export default function LiquidarDeudaPage() {
   
   const [saldos, setSaldos] = useState<SaldoGlobal[]>([]);
   const [oportunidades, setOportunidades] = useState<OportunidadNetting[]>([]);
-  
   const [pagosRecibidos, setPagosRecibidos] = useState<TransaccionDeuda[]>([]);
   const [pagosEnviados, setPagosEnviados] = useState<TransaccionDeuda[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
-  
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
-  
   const [procesandoId, setProcesandoId] = useState<number | null>(null);
   const [tipoAccion, setTipoAccion] = useState<"aprobar" | "rechazar" | null>(null);
 
@@ -132,7 +138,7 @@ export default function LiquidarDeudaPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
       const response = await fetch(`${apiUrl}/deudas/registrar`, {
         method: "POST",
-        headers: { "x-user-email": session.user.email || "" },
+        headers: { "x-user-email": session?.user?.email || "" },
         body: data, 
       });
 
@@ -227,61 +233,104 @@ export default function LiquidarDeudaPage() {
   
   const hayProcesamientoActivo = procesandoId !== null || isSubmittingForm;
 
+  const formatearDinero = (monto: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2
+    }).format(monto);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="font-medium text-sm tracking-wide">Sincronizando estado de cuenta con la Blockchain...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto p-6 relative">
-      <div className="mb-8 border-b pb-4">
-        <h1 className="text-3xl font-bold text-gray-800">Liquidación de Saldos Remanentes</h1>
-        <p className="text-gray-600 mt-2">Informa tus pagos físicos únicamente para las deudas unilaterales que queden luego del Netting.</p>
+    <div className="max-w-6xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      <div className="mb-8 border-b border-slate-200 pb-6">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mb-2">Liquidación de saldos remanentes</h1>
+        <p className="text-sm text-slate-500">Informa tus pagos físicos únicamente para las deudas unilaterales que queden luego de que el algoritmo de Netting haya operado.</p>
       </div>
 
       {mensaje && (
-        <div className={`p-4 mb-6 rounded-lg ${mensaje.tipo === "error" ? "bg-red-50 text-red-700 border-l-4 border-red-500" : "bg-green-50 text-green-700 border-l-4 border-green-500"}`}>
-          {mensaje.texto}
-        </div>
+        <Alert 
+          variant={mensaje.tipo === "error" ? "destructive" : "default"} 
+          className={`mb-8 shadow-sm ${mensaje.tipo === "exito" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : ""}`}
+        >
+          {mensaje.tipo === "error" ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          )}
+          <AlertTitle className="font-bold">
+            {mensaje.tipo === "error" ? "Atención" : "Operación Exitosa"}
+          </AlertTitle>
+          <AlertDescription>{mensaje.texto}</AlertDescription>
+        </Alert>
       )}
 
-      {isLoading ? (
-        <div className="text-center p-8 text-gray-500 font-medium animate-pulse">Sincronizando estado de cuenta con la Blockchain...</div>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-red-700 mb-4 flex items-center gap-2"><span>🔴</span> Deudas Pendientes de Pago</h2>
-            {misDeudas.length === 0 ? <p className="text-gray-500 italic text-sm">No tienes deudas activas.</p> : (
+      <div className="grid md:grid-cols-2 gap-8 mb-8">
+        <Card className="shadow-sm border-t-4 border-t-destructive">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-bold text-destructive flex items-center gap-2">
+              <Landmark className="h-5 w-5" /> Deudas pendientes de pago
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {misDeudas.length === 0 ? (
+              <p className="text-muted-foreground italic text-sm text-center py-6">No tienes deudas activas.</p>
+            ) : (
               <div className="space-y-4">
+                
                 {deudasBloqueadas.map((deuda, idx) => (
-                  <div key={`bloq-${idx}`} className="p-4 border border-orange-200 rounded-lg bg-orange-50 opacity-80">
-                    <div className="flex justify-between mb-2">
-                      <div><p className="text-xs text-orange-600 font-bold uppercase">Acreedor</p><p className="font-bold text-gray-800">{deuda.acreedor}</p></div>
-                      <div className="text-right"><p className="text-xl font-black text-red-500">${Number(deuda.monto_total).toLocaleString('es-AR')}</p></div>
+                  <div key={`bloq-${idx}`} className="p-4 border border-amber-200 rounded-lg bg-amber-50/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Acreedor</p>
+                        <p className="font-bold text-slate-900">{deuda.acreedor}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-amber-700">{formatearDinero(deuda.monto_total)}</p>
+                      </div>
                     </div>
-                    <div className="mt-2 p-2 bg-orange-100 rounded text-xs text-orange-800 font-medium">⚠️ Tienes saldos cruzados con esta empresa. Ejecuta el Netting primero.</div>
+                    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 mt-2 w-full justify-center py-1">
+                      <AlertTriangle className="w-3 h-3 mr-1.5" /> Saldos cruzados detectados. Ejecuta Netting primero.
+                    </Badge>
                   </div>
                 ))}
 
                 {deudasParaLiquidar.map((deuda, idx) => (
-                  <div key={`liq-${idx}`} className="p-4 border rounded-lg border-gray-200 bg-gray-50">
-                    <div className="flex justify-between mb-2">
-                      <div><p className="text-xs text-gray-500 font-bold uppercase">Acreedor</p><p className="font-bold text-gray-800">{deuda.acreedor}</p></div>
-                      <div className="text-right"><p className="text-xl font-black text-red-600">${Number(deuda.monto_total).toLocaleString('es-AR')}</p></div>
+                  <div key={`liq-${idx}`} className="p-4 border rounded-lg border-slate-200 bg-slate-50">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Acreedor</p>
+                        <p className="font-bold text-slate-900">{deuda.acreedor}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-destructive">{formatearDinero(deuda.monto_total)}</p>
+                      </div>
                     </div>
                     
                     {session?.user?.empresa_activa === false ? (
-                      <div className="w-full mt-2 text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
-                        Acción bloqueada (Baja Lógica)
+                      <div className="w-full mt-2 text-center text-destructive text-sm font-bold bg-destructive/10 p-2 rounded-md border border-destructive/20 flex items-center justify-center gap-2">
+                        <Lock className="w-4 h-4" /> Acción bloqueada (Baja Lógica)
                       </div>
                     ) : (
-                      <button 
+                      <Button 
+                        variant="outline"
                         onClick={() => setDeudaSeleccionada(deuda)} 
                         disabled={hayProcesamientoActivo}
-                        className={`w-full mt-2 border text-sm font-semibold py-2 px-4 rounded shadow-sm transition-all ${
-                          hayProcesamientoActivo 
-                            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
-                            : 'bg-white border-gray-300 text-gray-700 hover:text-blue-600'
-                        }`}
+                        className="w-full font-bold shadow-sm"
                       >
-                        Informar Transferencia Bancaria
-                      </button>
+                        <Wallet className="w-4 h-4 mr-2" /> Informar Transferencia Bancaria
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -289,77 +338,82 @@ export default function LiquidarDeudaPage() {
             )}
 
             {pagosEnviados.length > 0 && (
-              <div className="mt-8 border-t pt-6">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">Pagos Informados (Esperando Confirmación)</h3>
-                <div className="space-y-3">
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Pagos Informados (Esperando Validación)</h3>
+                <div className="space-y-2">
                   {pagosEnviados.map(liq => (
-                    <div key={liq.id} className="p-3 bg-gray-100 rounded text-sm flex justify-between border border-gray-200">
-                      <span>A: <strong>{liq.empresa_receptora.nombre}</strong></span>
-                      <span className="text-gray-500 italic">⏳ Pendiente</span>
+                    <div key={liq.id} className="p-3 bg-slate-50 rounded-md text-sm flex justify-between items-center border border-slate-200">
+                      <span className="text-slate-600">A: <strong className="text-slate-900">{liq.empresa_receptora.nombre}</strong></span>
+                      <Badge variant="secondary" className="text-slate-500 bg-slate-100 border-slate-200">
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Pendiente
+                      </Badge>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex flex-col gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-t-yellow-500 border border-gray-200">
-              <h2 className="text-xl font-bold text-yellow-700 mb-4 flex items-center gap-2"><span>⚠️</span> Validar Pagos Recibidos</h2>
-              {pagosRecibidos.length === 0 ? <p className="text-gray-500 italic text-sm">No hay transferencias pendientes de validación.</p> : (
+        <div className="flex flex-col gap-8">
+          
+          <Card className="shadow-sm border-t-4 border-t-amber-500">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-bold text-amber-700 flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5" /> Validar pagos recibidos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pagosRecibidos.length === 0 ? (
+                <p className="text-muted-foreground italic text-sm text-center py-4">No hay transferencias pendientes de validación.</p>
+              ) : (
                 <div className="space-y-4">
                   {pagosRecibidos.map((liq) => {
                     const esElProcesado = procesandoId === liq.id;
                     const estaQuemando = esElProcesado && tipoAccion === "aprobar";
-                    const estaRechazando = esElProcesado && tipoAccion === "rechazar";
 
                     return (
-                      <div key={liq.id} className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
-                        <div className="flex justify-between items-start mb-2">
-                          <div><p className="text-xs text-gray-500 font-bold uppercase">Deudor informante</p><p className="font-bold text-gray-800">{liq.empresa_emisora.nombre}</p></div>
-                          <div className="text-right"><p className="text-xl font-black text-yellow-700">${Number(liq.monto).toLocaleString('es-AR')}</p></div>
+                      <div key={liq.id} className="p-4 border border-amber-200 rounded-lg bg-amber-50/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="text-[10px] text-amber-700/70 font-bold uppercase tracking-wider">Deudor Informante</p>
+                            <p className="font-bold text-slate-900">{liq.empresa_emisora.nombre}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-black text-amber-700">{formatearDinero(liq.monto)}</p>
+                          </div>
                         </div>
-                        <div className="mb-3">
-                          <a href={liq.url_documento_respaldo} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline font-medium inline-flex items-center gap-1">📄 Ver Comprobante Bancario</a>
-                          <p className="text-xs text-gray-500 mt-1 italic">{liq.detalle}</p>
+                        
+                        <div className="mb-4 space-y-2">
+                          <a href={liq.url_documento_respaldo} target="_blank" rel="noopener noreferrer" className="text-primary text-sm hover:underline font-bold inline-flex items-center gap-1.5 transition-colors">
+                            <FileText className="w-4 h-4" /> Ver comprobante bancario
+                          </a>
+                          <p className="text-xs text-slate-500 italic bg-white p-2 rounded border border-amber-100">{liq.detalle}</p>
                         </div>
 
                         {session?.user?.empresa_activa === false ? (
-                          <div className="w-full text-center text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-200">
-                            Acción bloqueada (Solo Lectura)
+                          <div className="w-full text-center text-destructive text-sm font-bold bg-destructive/10 p-2.5 rounded-md border border-destructive/20 flex items-center justify-center gap-2">
+                            <Lock className="w-4 h-4" /> Acción bloqueada (Solo Lectura)
                           </div>
                         ) : (
-                          <div className="flex gap-2">
-                            <button 
+                          <div className="flex gap-3">
+                            <Button 
+                              variant="outline"
                               onClick={() => abrirModalRechazo(liq.id)} 
                               disabled={hayProcesamientoActivo} 
-                              className={`flex-1 border py-2 rounded font-bold text-sm transition-all ${
-                                hayProcesamientoActivo 
-                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
-                                  : 'bg-white border-red-300 text-red-600 hover:bg-red-50'
-                              }`}
+                              className="flex-1 font-bold text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
                             >
                               Rechazar
-                            </button>
-                            <button 
+                            </Button>
+                            <Button 
                               onClick={() => handleAprobarCobro(liq.id)} 
                               disabled={hayProcesamientoActivo} 
-                              className={`flex-1 py-2 rounded font-bold text-sm text-white transition-all flex justify-center items-center gap-2 ${
-                                hayProcesamientoActivo 
-                                  ? 'bg-gray-400 cursor-not-allowed' 
-                                  : 'bg-green-600 hover:bg-green-700'
-                              }`}
+                              className="flex-1 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
                             >
                               {estaQuemando ? (
-                                <>
-                                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  ⏳ Quemando en BFA...
-                                </>
-                              ) : "Validar Cobro"}
-                            </button>
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Quemando...</>
+                              ) : "Validar cobro"}
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -367,93 +421,154 @@ export default function LiquidarDeudaPage() {
                   })}
                 </div>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2"><span>🟢</span> Saldos a Favor Remanentes</h2>
-              {misCobros.length === 0 ? <p className="text-gray-500 italic text-sm">No tienes saldos a favor.</p> : (
+          <Card className="shadow-sm border-t-4 border-t-emerald-500">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-bold text-emerald-700 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" /> Saldos a favor remanentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {misCobros.length === 0 ? (
+                <p className="text-muted-foreground italic text-sm text-center py-2">No tienes saldos a favor.</p>
+              ) : (
                 <div className="space-y-3">
                   {misCobros.map((cobro, idx) => (
-                    <div key={idx} className="p-3 border-b border-gray-100 last:border-0 flex justify-between">
-                      <span className="font-bold text-gray-700">{cobro.deudor}</span>
-                      <span className="font-black text-green-600">${Number(cobro.monto_total).toLocaleString('es-AR')}</span>
+                    <div key={idx} className="p-3 border-b border-slate-100 last:border-0 flex justify-between items-center">
+                      <span className="font-bold text-slate-700 text-sm">{cobro.deudor}</span>
+                      <span className="font-black text-emerald-600 text-lg">{formatearDinero(cobro.monto_total)}</span>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </CardContent>
+          </Card>
 
-      {deudaSeleccionada && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-600 mt-4 animate-fade-in-up">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold">Cargar Comprobante Bancario</h3>
-            <button onClick={() => setDeudaSeleccionada(null)} disabled={isSubmittingForm} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
-          </div>
-          <form onSubmit={handleSubmitPago} className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Referencia</label>
-              <input type="text" value={referenciaBancaria} onChange={(e) => setReferenciaBancaria(e.target.value)} required placeholder="Ej. TRF-1234567" disabled={isSubmittingForm} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 disabled:bg-gray-100" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Comprobante (PDF)</label>
-              <input type="file" accept="application/pdf" onChange={handleFileChange} required disabled={isSubmittingForm} className="w-full p-2 border rounded file:bg-blue-50 file:text-blue-700 disabled:bg-gray-100" />
-            </div>
-            <div className="md:col-span-2">
-              <button type="submit" disabled={isSubmittingForm} className={`w-full py-3 rounded font-bold text-white transition-all flex justify-center items-center gap-2 ${isSubmittingForm ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                {isSubmittingForm ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Subiendo Comprobante...
-                  </>
-                ) : "Confirmar y Enviar Comprobante"}
-              </button>
-            </div>
-          </form>
         </div>
-      )}
+      </div>
 
-      {modalRechazo.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md border-t-4 border-red-500">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Rechazar Comprobante Bancario</h3>
-            <p className="text-sm text-gray-600 mb-4">Indique el motivo del rechazo. Esta información será enviada a la empresa deudora para que suba un comprobante válido.</p>
-            
-            <textarea
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 mb-4 resize-none outline-none"
-              rows={4}
+      <Dialog 
+        open={!!deudaSeleccionada} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isSubmittingForm) setDeudaSeleccionada(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-125 p-0 overflow-hidden border-t-4 border-t-primary">
+          <div className="p-6">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-xl font-bold text-slate-900">
+                Informar Transferencia Bancaria
+              </DialogTitle>
+              <DialogDescription className="text-sm text-slate-500 pt-1">
+                Adjunta el comprobante bancario para notificar el pago a <span className="font-bold text-slate-800">{deudaSeleccionada?.acreedor}</span> por <span className="font-bold text-slate-800">{deudaSeleccionada ? formatearDinero(deudaSeleccionada.monto_total) : ""}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmitPago} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="referenciaBancaria" className="text-slate-700 font-semibold">Referencia de Transferencia</Label>
+                  <Input 
+                    type="text" 
+                    id="referenciaBancaria"
+                    value={referenciaBancaria} 
+                    onChange={(e) => setReferenciaBancaria(e.target.value)} 
+                    required 
+                    placeholder="Ej. TRF-1234567" 
+                    disabled={isSubmittingForm} 
+                    className="bg-slate-50/50" 
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="comprobante" className="text-slate-700 font-semibold">Comprobante (Solo PDF)</Label>
+                  <Input 
+                    type="file" 
+                    id="comprobante"
+                    accept="application/pdf" 
+                    onChange={handleFileChange} 
+                    required 
+                    disabled={isSubmittingForm} 
+                    className="cursor-pointer bg-slate-50/50 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-900 hover:file:bg-slate-300" 
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="pt-4 border-t border-slate-100">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setDeudaSeleccionada(null)} 
+                  disabled={isSubmittingForm}
+                  className="font-semibold text-slate-600 hover:text-slate-900"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmittingForm} 
+                  className="font-bold shadow-sm w-full sm:w-auto"
+                >
+                  {isSubmittingForm ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Subiendo...</>
+                  ) : "Confirmar y Enviar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={modalRechazo.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen && procesandoId !== modalRechazo.liquidacionId) {
+            setModalRechazo({ isOpen: false, liquidacionId: null });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-112.5 border-t-4 border-t-destructive p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-bold text-slate-900">Rechazar Comprobante</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600 pt-2">
+              Indique el motivo del rechazo. Esta información será enviada a la empresa deudora para que suba un comprobante válido.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-2">
+            <Textarea
               placeholder="Ej: El comprobante está ilegible, la transferencia no impactó..."
               value={motivoRechazo}
               onChange={(e) => setMotivoRechazo(e.target.value)}
               disabled={procesandoId === modalRechazo.liquidacionId}
-            ></textarea>
-
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setModalRechazo({ isOpen: false, liquidacionId: null })}
-                className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded transition-colors"
-                disabled={procesandoId === modalRechazo.liquidacionId}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmarRechazo}
-                className={`px-4 py-2 rounded font-bold text-white transition-colors ${
-                  procesandoId === modalRechazo.liquidacionId ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
-                }`}
-                disabled={procesandoId === modalRechazo.liquidacionId}
-              >
-                {procesandoId === modalRechazo.liquidacionId ? "Procesando..." : "Confirmar Rechazo"}
-              </button>
-            </div>
+              className="resize-none focus-visible:ring-destructive min-h-30 text-sm bg-slate-50/50"
+            />
           </div>
-        </div>
-      )}
+          
+          <DialogFooter className="gap-3 sm:gap-0 mt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalRechazo({ isOpen: false, liquidacionId: null })}
+              disabled={procesandoId === modalRechazo.liquidacionId}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmarRechazo}
+              disabled={procesandoId === modalRechazo.liquidacionId}
+              className="font-bold shadow-sm"
+            >
+              {procesandoId === modalRechazo.liquidacionId ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
+              ) : "Confirmar Rechazo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

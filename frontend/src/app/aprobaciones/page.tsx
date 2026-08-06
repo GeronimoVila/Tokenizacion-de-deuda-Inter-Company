@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Empresa {
   id: number;
@@ -99,6 +106,7 @@ export default function AprobacionesPage() {
   const confirmarRechazo = async () => {
     if (!modalRechazo.deudaId || !motivoRechazo.trim()) {
       setMensaje({ tipo: "error", texto: "Debe proporcionar un motivo de rechazo válido para el emisor." });
+      setModalRechazo({ isOpen: false, deudaId: null });
       return;
     }
     
@@ -132,121 +140,190 @@ export default function AprobacionesPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-600">Cargando operaciones pendientes...</div>;
+  const formatearDinero = (monto: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2
+    }).format(monto);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="font-medium text-sm tracking-wide">Cargando operaciones pendientes...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 relative">
-      <h1 className="text-3xl font-bold mb-2 text-gray-800">Bandeja de Aprobación Dual</h1>
-      <p className="text-gray-600 mb-6">Operaciones y remitos pendientes de revisión corporativa.</p>
+    <div className="max-w-5xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mb-2">Bandeja de aprobación dual</h1>
+        <p className="text-sm text-slate-500">Operaciones y remitos pendientes de revisión corporativa.</p>
+      </div>
 
       {mensaje && (
-        <div className={`p-4 mb-6 rounded-lg ${mensaje.tipo === "error" ? "bg-red-50 text-red-700 border-l-4 border-red-500" : "bg-green-50 text-green-700 border-l-4 border-green-500"}`}>
-          {mensaje.texto}
-        </div>
+        <Alert 
+          variant={mensaje.tipo === "error" ? "destructive" : "default"} 
+          className={`mb-6 shadow-sm ${mensaje.tipo === "exito" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : ""}`}
+        >
+          {mensaje.tipo === "error" ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          )}
+          <AlertTitle className="font-bold">
+            {mensaje.tipo === "error" ? "Atención" : "Confirmación"}
+          </AlertTitle>
+          <AlertDescription>{mensaje.texto}</AlertDescription>
+        </Alert>
       )}
 
       {pendientes.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 p-8 text-center rounded-lg text-gray-500">
-          No hay operaciones pendientes de aprobación en este momento.
-        </div>
+        <Card className="border-dashed border-2 shadow-none bg-slate-50/50">
+          <CardContent className="flex flex-col items-center justify-center p-12 text-slate-400">
+            <CheckCircle2 className="h-12 w-12 mb-4 text-slate-300" />
+            <h3 className="text-lg font-semibold text-slate-900">Bandeja limpia</h3>
+            <p className="text-sm mt-1 text-slate-500 text-center">No hay operaciones pendientes de aprobación en este momento.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           {pendientes.map((deuda) => (
-            <div key={deuda.id} className="p-5 rounded-lg shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4 bg-white border-gray-200">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold uppercase tracking-wide">Factura Pendiente</span>
-                  <span className="text-sm text-gray-500 font-medium">ID Op: #{deuda.id}</span>
-                </div>
-                
-                <h3 className="text-2xl font-black text-gray-800">
-                  Monto: ${Number(deuda.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                </h3>
-                
-                <div className="mt-2 text-sm text-gray-700">
-                  <p><strong>Acreedor (Quién subió):</strong> {deuda.empresa_emisora.nombre}</p>
-                  <p><strong>Deudor (Vos):</strong> {deuda.empresa_receptora.nombre}</p>
-                </div>
-                
-                <p className="text-sm text-gray-500 mt-2 bg-gray-50 p-2 rounded"><em>Detalle: {deuda.detalle}</em></p>
-                
-                <a href={deuda.url_documento_respaldo} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline mt-3 inline-flex items-center gap-1 font-bold">
-                  📄 Ver PDF Respaldatorio (IPFS)
-                </a>
-              </div>
+            <Card key={deuda.id} className="shadow-sm border-slate-200 overflow-hidden transition-all hover:shadow-md">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 font-bold uppercase tracking-widest text-[10px] px-2.5 py-0.5">
+                        Factura Pendiente
+                      </Badge>
+                      <span className="text-sm font-semibold text-slate-500">ID Op: #{deuda.id}</span>
+                    </div>
+                    
+                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+                      Monto: {formatearDinero(deuda.monto)}
+                    </h3>
+                    
+                    <div className="text-sm text-slate-700 space-y-1.5 pt-2">
+                      <p><span className="font-semibold text-slate-900">Acreedor:</span> {deuda.empresa_emisora.nombre}</p>
+                      <p><span className="font-semibold text-slate-900">Deudor:</span> {deuda.empresa_receptora.nombre}</p>
+                    </div>
+                    
+                    <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-lg text-sm text-slate-600 italic">
+                      Detalle: {deuda.detalle}
+                    </div>
+                    
+                    <div className="pt-1">
+                      <a 
+                        href={deuda.url_documento_respaldo} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center text-sm font-bold text-primary hover:underline hover:text-primary/80 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Ver PDF de respaldo
+                      </a>
+                    </div>
+                  </div>
 
-              <div className="flex flex-col gap-2 min-w-50">
-                {deuda.empresa_receptora.id === session?.user?.empresa_id ? (
-                  session?.user?.empresa_activa === false ? (
-                    <span className="text-sm text-red-600 font-bold bg-red-50 px-4 py-3 rounded border border-red-200 text-center">
-                      Subsidiaria Inactiva (Solo lectura)
-                    </span>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleAprobar(deuda)}
-                        disabled={procesandoId === deuda.id}
-                        className={`w-full px-4 py-3 rounded font-bold text-white shadow-sm transition-all ${
-                          procesandoId === deuda.id ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"
-                        }`}
-                      >
-                        {procesandoId === deuda.id && accionSeleccionada === "aprobar" ? "Cargando..." : "Aprobar (Minting)"}
-                      </button>
-                      
-                      <button
-                        onClick={() => abrirModalRechazo(deuda.id)}
-                        disabled={procesandoId === deuda.id}
-                        className={`w-full px-4 py-2 rounded font-medium text-red-700 bg-white hover:bg-red-50 border border-red-200 transition ${procesandoId === deuda.id && "opacity-50 cursor-not-allowed"}`}
-                      >
-                        Rechazar Comprobante
-                      </button>
-                    </>
-                  )
-                ) : (
-                  <span className="text-sm text-gray-500 italic bg-gray-100 px-4 py-3 rounded border text-center">Esperando contraparte</span>
-                )}
-              </div>
-            </div>
+                  <div className="flex flex-col gap-3 min-w-60 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-8">
+                    {deuda.empresa_receptora.id === session?.user?.empresa_id ? (
+                      session?.user?.empresa_activa === false ? (
+                        <div className="bg-destructive/10 text-destructive text-sm font-bold px-4 py-3 rounded-md border border-destructive/20 text-center">
+                          Subsidiaria Inactiva (Solo lectura)
+                        </div>
+                      ) : (
+                        <>
+                          <Button 
+                            onClick={() => handleAprobar(deuda)}
+                            disabled={procesandoId === deuda.id}
+                            className="w-full font-bold shadow-sm h-12 text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            {procesandoId === deuda.id && accionSeleccionada === "aprobar" ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
+                            ) : (
+                              "Aprobar (Minting)"
+                            )}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={() => abrirModalRechazo(deuda.id)}
+                            disabled={procesandoId === deuda.id}
+                            className="w-full font-bold text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 h-12 text-sm transition-colors"
+                          >
+                            Rechazar comprobante
+                          </Button>
+                        </>
+                      )
+                    ) : (
+                      <div className="bg-slate-100 text-slate-500 text-sm font-semibold px-4 py-3 rounded-md border border-slate-200 text-center flex items-center justify-center italic h-12">
+                        Esperando contraparte
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
-      {modalRechazo.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md border-t-4 border-red-500">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Rechazar Operación</h3>
-            <p className="text-sm text-gray-600 mb-4">Indique el motivo del rechazo. Esta información será enviada a la empresa emisora para que corrija la carga.</p>
-            
-            <textarea
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 mb-4 resize-none outline-none"
-              rows={4}
+      <Dialog 
+        open={modalRechazo.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen && procesandoId !== modalRechazo.deudaId) {
+            setModalRechazo({ isOpen: false, deudaId: null });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-112.5 border-t-4 border-t-destructive p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-bold text-slate-900">Rechazar Operación</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600 pt-2">
+              Indique el motivo del rechazo. Esta información será enviada a la empresa emisora para que corrija la carga.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-2">
+            <Textarea
               placeholder="Ej: El monto en el PDF no coincide con lo declarado..."
               value={motivoRechazo}
               onChange={(e) => setMotivoRechazo(e.target.value)}
               disabled={procesandoId === modalRechazo.deudaId}
-            ></textarea>
-
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setModalRechazo({ isOpen: false, deudaId: null })}
-                className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded transition-colors"
-                disabled={procesandoId === modalRechazo.deudaId}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmarRechazo}
-                className={`px-4 py-2 rounded font-bold text-white transition-colors ${
-                  procesandoId === modalRechazo.deudaId ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
-                }`}
-                disabled={procesandoId === modalRechazo.deudaId}
-              >
-                {procesandoId === modalRechazo.deudaId ? "Procesando..." : "Confirmar Rechazo"}
-              </button>
-            </div>
+              className="resize-none focus-visible:ring-destructive min-h-30 text-sm"
+            />
           </div>
-        </div>
-      )}
+          
+          <DialogFooter className="gap-3 sm:gap-0 mt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalRechazo({ isOpen: false, deudaId: null })}
+              disabled={procesandoId === modalRechazo.deudaId}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmarRechazo}
+              disabled={procesandoId === modalRechazo.deudaId}
+              className="font-bold shadow-sm"
+            >
+              {procesandoId === modalRechazo.deudaId ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
+              ) : (
+                "Confirmar Rechazo"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
