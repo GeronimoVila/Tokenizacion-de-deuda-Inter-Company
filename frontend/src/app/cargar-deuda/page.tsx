@@ -219,7 +219,7 @@ export default function CargarDeudaPage() {
 
             <div className="space-y-2">
               <Label htmlFor="monto" className="text-slate-700 font-semibold">
-                Monto (ARS)
+                Monto
               </Label>
               <Input
                 type="number"
@@ -230,7 +230,6 @@ export default function CargarDeudaPage() {
                 required
                 min="1.00"
                 step="1.00"
-                placeholder="0"
                 className="bg-slate-50/50 font-mono"
               />
             </div>

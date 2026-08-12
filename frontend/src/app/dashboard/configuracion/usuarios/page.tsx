@@ -2,11 +2,11 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Users, ShieldAlert, Building2 } from "lucide-react";
+import { Loader2, Plus, Users, ShieldAlert, Building2, Search, FilterX, UserX, UserCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ interface Usuario {
   id: number;
   name: string;
   email: string;
+  activo: boolean;
   rol: { nombre: string };
   empresa?: { nombre: string } | null;
 }
@@ -46,6 +47,11 @@ export default function GestionUsuariosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEmail, setFiltroEmail] = useState("");
+  const [filtroRol, setFiltroRol] = useState("TODOS");
+  const [filtroEmpresa, setFiltroEmpresa] = useState("TODAS");
+  const [filtroEstado, setFiltroEstado] = useState("TODOS");
 
   const miRol = session?.user?.rol_id;
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
@@ -122,12 +128,73 @@ export default function GestionUsuariosPage() {
     }
   };
 
+  const alternarEstadoUsuario = async (id: number, estadoActual: boolean) => {
+    const accion = estadoActual ? "desactivar" : "activar";
+    if (!confirm(`¿Estás seguro que deseas ${accion} este usuario?`)) return;
+
+    try {
+      const res = await fetch(`${apiUrl}/usuarios/${id}/estado`, {
+        method: "PATCH",
+        headers: getHeaders(),
+      });
+
+      if (res.ok) {
+        cargarDatos();
+      } else {
+        const data = await res.json();
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Error al cambiar estado:", error);
+    }
+  };
+
   const abrirModal = () => {
     reset({ nombre: "", email: "", rol_id: "", empresa_id: "" });
     setIsModalOpen(true);
   };
 
   const cerrarModal = () => setIsModalOpen(false);
+
+  const formatearNombreRol = (rolBd: string | undefined) => {
+    if (!rolBd) return "Desconocido";
+    const mapaRoles: Record<string, string> = {
+      "admin_holding": "Administrador del Holding",
+      "admin_subsidiaria": "Administrador de Subsidiaria",
+      "operador": "Operador",
+      "auditor": "Auditor",
+      "superadmin": "Administrador Global",
+    };
+    const clave = rolBd.toLowerCase().trim();
+    return mapaRoles[clave] || rolBd.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const limpiarFiltros = () => {
+    setFiltroNombre("");
+    setFiltroEmail("");
+    setFiltroRol("TODOS");
+    setFiltroEmpresa("TODAS");
+    setFiltroEstado("TODOS");
+  };
+
+  const usuariosFiltrados = useMemo(() => {
+    return usuarios.filter((user) => {
+      const coincideNombre = user.name.toLowerCase().includes(filtroNombre.toLowerCase());
+      const coincideEmail = user.email.toLowerCase().includes(filtroEmail.toLowerCase());
+      const coincideRol = filtroRol === "TODOS" || user.rol?.nombre === filtroRol;
+      const nombreEmpresa = user.empresa?.nombre || "Global";
+      const coincideEmpresa = filtroEmpresa === "TODAS" || nombreEmpresa === filtroEmpresa;
+      
+      let coincideEstado = true;
+      if (filtroEstado === "ACTIVO") coincideEstado = user.activo === true;
+      if (filtroEstado === "INACTIVO") coincideEstado = user.activo === false;
+
+      return coincideNombre && coincideEmail && coincideRol && coincideEmpresa && coincideEstado;
+    });
+  }, [usuarios, filtroNombre, filtroEmail, filtroRol, filtroEmpresa, filtroEstado]);
+
+  const rolesEnTabla = Array.from(new Set(usuarios.map(u => u.rol?.nombre).filter(Boolean)));
+  const empresasEnTabla = Array.from(new Set(usuarios.map(u => u.empresa?.nombre || "Global")));
 
   if (isLoading) {
     return (
@@ -140,7 +207,7 @@ export default function GestionUsuariosPage() {
   const rolesDisponibles = [
     { id: 3, nombre: "Administrador de Subsidiaria" },
     { id: 4, nombre: "Operador (Carga de Deuda)" },
-    { id: 5, nombre: "Auditor" },
+    { id: 5, nombre: "Auditor Corporativo" },
   ].filter(rol => rol.id > (miRol || 99));
 
   return (
@@ -160,6 +227,92 @@ export default function GestionUsuariosPage() {
         </Button>
       </div>
 
+      <Card className="shadow-sm border-slate-200 mb-6 bg-white">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
+            <div className="space-y-1.5 xl:col-span-1">
+              <Label className="text-xs font-semibold text-slate-500">Buscar por nombre</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input 
+                  placeholder="Ej. Juan Pérez" 
+                  value={filtroNombre} 
+                  onChange={(e) => setFiltroNombre(e.target.value)}
+                  className="pl-9 h-9 text-sm bg-slate-50/50"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1.5 xl:col-span-1">
+              <Label className="text-xs font-semibold text-slate-500">Buscar por correo</Label>
+              <Input 
+                placeholder="usuario@empresa.com" 
+                value={filtroEmail} 
+                onChange={(e) => setFiltroEmail(e.target.value)}
+                className="h-9 text-sm bg-slate-50/50"
+              />
+            </div>
+
+            <div className="space-y-1.5 xl:col-span-1">
+              <Label className="text-xs font-semibold text-slate-500">Filtrar por rol</Label>
+              <Select value={filtroRol} onValueChange={setFiltroRol}>
+                <SelectTrigger className="h-9 text-sm bg-slate-50/50">
+                  <SelectValue placeholder="Todos los roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todos los roles</SelectItem>
+                  {rolesEnTabla.map((rolDb) => (
+                    <SelectItem key={rolDb} value={rolDb}>{formatearNombreRol(rolDb)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {miRol === 2 && (
+              <div className="space-y-1.5 xl:col-span-1">
+                <Label className="text-xs font-semibold text-slate-500">Filtrar subsidiaria</Label>
+                <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>
+                  <SelectTrigger className="h-9 text-sm bg-slate-50/50">
+                    <SelectValue placeholder="Todas las empresas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODAS">Todas las empresas</SelectItem>
+                    {empresasEnTabla.map((emp) => (
+                      <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5 xl:col-span-1">
+              <Label className="text-xs font-semibold text-slate-500">Estado</Label>
+              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                <SelectTrigger className="h-9 text-sm bg-slate-50/50">
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todos los estados</SelectItem>
+                  <SelectItem value="ACTIVO">Activos</SelectItem>
+                  <SelectItem value="INACTIVO">Inactivos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end xl:col-span-1">
+              <Button 
+                variant="ghost" 
+                onClick={limpiarFiltros}
+                className="h-9 w-full xl:w-auto text-slate-500 hover:text-slate-900 font-semibold text-sm px-3"
+              >
+                <FilterX className="h-4 w-4 mr-2" />
+                Limpiar
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="shadow-sm border-slate-200">
         <CardContent className="p-0">
           <Table>
@@ -169,16 +322,18 @@ export default function GestionUsuariosPage() {
                 <TableHead className="font-bold text-slate-600">Correo electrónico</TableHead>
                 <TableHead className="font-bold text-slate-600">Rol</TableHead>
                 <TableHead className="font-bold text-slate-600">Subsidiaria</TableHead>
+                <TableHead className="font-bold text-slate-600">Estado</TableHead>
+                <TableHead className="font-bold text-slate-600 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {usuarios.map((user) => (
-                <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors">
+              {usuariosFiltrados.map((user) => (
+                <TableRow key={user.id} className={`transition-colors ${!user.activo ? 'opacity-60 bg-slate-50' : 'hover:bg-slate-50/50'}`}>
                   <TableCell className="font-semibold text-slate-900">{user.name}</TableCell>
                   <TableCell className="text-slate-500">{user.email}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 uppercase text-[10px] font-bold tracking-wider">
-                      {user.rol?.nombre}
+                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold tracking-wider">
+                      {formatearNombreRol(user.rol?.nombre)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-slate-600 font-medium">
@@ -191,15 +346,33 @@ export default function GestionUsuariosPage() {
                       <span className="text-slate-400 italic text-xs">Acceso Global</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-[10px] font-bold tracking-wider uppercase ${user.activo ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      {user.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => alternarEstadoUsuario(user.id, user.activo)}
+                      disabled={session?.user?.email === user.email}
+                      className={user.activo ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"}
+                      title={session?.user?.email === user.email ? "No puedes modificar tu propio acceso" : (user.activo ? "Desactivar acceso" : "Reactivar acceso")}
+                    >
+                      {user.activo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
-              {usuarios.length === 0 && (
+              
+              {usuariosFiltrados.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400">
                       <Users className="h-8 w-8 mb-3 text-slate-300" />
-                      <span className="text-sm font-semibold text-slate-900">Sin usuarios</span>
-                      <span className="text-sm mt-1">No hay usuarios registrados en el entorno.</span>
+                      <span className="text-sm font-semibold text-slate-900">Sin resultados</span>
+                      <span className="text-sm mt-1">No se encontraron usuarios que coincidan con los filtros aplicados.</span>
                     </div>
                   </TableCell>
                 </TableRow>

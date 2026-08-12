@@ -17,6 +17,7 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
         rol_id: true,
         empresa_id: true,
         grupo_id: true,
+        activo: true,
         empresa: { select: { activa: true } },
         grupo: { select: { activo: true } }
       }
@@ -25,6 +26,11 @@ export const verifyAndSyncUser = async (req: Request, res: Response): Promise<an
     if (!dbUser) {
       console.warn(`🚨 Login bloqueado: ${email} no pertenece al sistema.`);
       return res.status(403).json({ error: "Acceso denegado. Usuario no registrado." });
+    }
+
+    if (dbUser.activo === false) {
+      console.warn(`🚨 Login bloqueado (Baja Lógica): La cuenta de ${email} ha sido desactivada por la administración.`);
+      return res.status(403).json({ error: "Acceso denegado. Su cuenta se encuentra inactiva." });
     }
 
     if (!dbUser.rol_id) {

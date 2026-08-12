@@ -1,15 +1,18 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Loader2, Landmark, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, Suspense } from "react";
+import { Loader2, Landmark, ShieldCheck, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-export default function Home() {
+function LoginContent() {
   const { status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -40,6 +43,18 @@ export default function Home() {
               <Landmark className="w-10 h-10 text-primary" />
             </div>
           </div>
+          
+          {error && (
+            <Alert variant="destructive" className="mb-6 shadow-md border-red-200 bg-red-50 text-red-900">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertTitle className="font-bold text-red-700">Acceso Denegado</AlertTitle>
+              <AlertDescription className="text-red-600/90 mt-1">
+                {error === "AccessDenied" 
+                  ? "Tu cuenta no está registrada en el sistema o ha sido inhabilitada. Contacta al Administrador."
+                  : "Ocurrió un error inesperado al intentar validar tus credenciales corporativas."}
+              </AlertDescription>
+            </Alert>
+          )}
           
           <Card className="shadow-xl border-slate-200 bg-white">
             <CardHeader className="text-center pb-6">
@@ -88,4 +103,16 @@ export default function Home() {
   }
 
   return null;
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
 }

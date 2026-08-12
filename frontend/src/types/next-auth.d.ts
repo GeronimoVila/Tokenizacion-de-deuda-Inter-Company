@@ -10,6 +10,7 @@ declare module "next-auth" {
       grupo_id?: number;
       empresa_activa?: boolean;
       holding_activo?: boolean;
+      activo?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -19,6 +20,7 @@ declare module "next-auth" {
     grupo_id?: number;
     empresa_activa?: boolean;
     holding_activo?: boolean;
+    activo?: boolean;
   }
 }
 
@@ -29,5 +31,6 @@ declare module "next-auth/jwt" {
     grupo_id?: number;
     empresa_activa?: boolean;
     holding_activo?: boolean;
+    activo?: boolean;
   }
 }

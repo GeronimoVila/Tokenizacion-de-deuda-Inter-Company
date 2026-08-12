@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registrarNuevoHolding, listarHoldings, toggleEstadoHolding  } from '../controllers/sysadmin.controller.js';
+import { registrarNuevoHolding, listarHoldings, toggleEstadoHolding, obtenerMetricasSysadmin } from '../controllers/sysadmin.controller.js';
 import { requerirRol, ROLES } from '../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -14,5 +14,7 @@ router.post( '/holding', requerirRol([ROLES.SYSADMIN]), registrarNuevoHolding );
 router.get('/holding', requerirRol([ROLES.SYSADMIN]), listarHoldings);
 
 router.patch('/holding/:id/toggle-status', requerirRol([ROLES.SYSADMIN]), toggleEstadoHolding);
+
+router.get('/metrics', requerirRol([ROLES.SYSADMIN]), obtenerMetricasSysadmin);
 
 export default router;

@@ -14,7 +14,7 @@ model Grupos_empresariales {
   nombre         String     @db.VarChar
   cuit           String     @db.VarChar
   fecha_creacion DateTime   @default(now()) @db.Timestamp()
-  activo  Boolean  @default(true)
+  activo         Boolean    @default(true)
   
   empresas       Empresas[]
   usuarios       User[]
@@ -51,6 +51,7 @@ model User {
   grupo_id      Int?
   empresa_id    Int?      
   rol_id        Int?      
+  activo        Boolean   @default(true)
 
   grupo         Grupos_empresariales? @relation(fields: [grupo_id], references: [id])
   empresa       Empresas?             @relation(fields: [empresa_id], references: [id])

@@ -17,6 +17,7 @@ export interface UsuarioPayload {
   empresa_id: number | null;
   empresa_activa?: boolean;
   holding_activo?: boolean;
+  activo?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -44,6 +45,12 @@ export const requerirRol = (rolesPermitidos: number[]) => {
 
       if (!usuarioDB || !usuarioDB.rol_id) {
         res.status(403).json({ error: "Acceso denegado. Usuario no registrado o sin rol asignado." });
+        return;
+      }
+
+      if (usuarioDB.activo === false) {
+        console.warn(`🚨 Sesión interceptada y bloqueada: ${usuarioDB.email} intentó operar con una cuenta desactivada.`);
+        res.status(403).json({ error: "Acceso denegado. Su cuenta corporativa ha sido desactivada." });
         return;
       }
 
@@ -77,7 +84,8 @@ export const requerirRol = (rolesPermitidos: number[]) => {
         grupo_id: usuarioDB.grupo_id,
         empresa_id: usuarioDB.empresa_id,
         empresa_activa: usuarioDB.empresa?.activa ?? true,
-        holding_activo: usuarioDB.grupo?.activo ?? true
+        holding_activo: usuarioDB.grupo?.activo ?? true,
+        activo: usuarioDB.activo
       };
 
       next();

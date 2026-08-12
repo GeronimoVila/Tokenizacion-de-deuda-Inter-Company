@@ -131,3 +131,72 @@ export const toggleEstadoHolding = async (req: Request, res: Response): Promise<
     res.status(500).json({ error: "Error interno al modificar el estado del grupo empresarial." });
   }
 };
+
+export interface MetricasSysadminResponse {
+  totalHoldings: number;
+  totalSubsidiarias: number;
+  totalUsuarios: number;
+  totalContratosBFA: number;
+  crecimiento: { name: string; cantidad: number }[];
+  distribucionRoles: { name: string; value: number }[];
+}
+
+/**
+ * @desc Calcula las métricas globales del ecosistema cruzando datos de PostgreSQL.
+ * Implementa consultas en paralelo (Non-blocking I/O) para no afectar el rendimiento.
+ */
+export const obtenerMetricasSysadmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [
+      totalHoldings,
+      totalSubsidiarias,
+      totalUsuarios,
+      totalContratosBFA,
+      adminHoldingCount,
+      adminSubCount,
+      operadorCount,
+      auditorCount
+    ] = await Promise.all([
+      prisma.grupos_empresariales.count({ where: { activo: true } }),
+      
+      prisma.empresas.count({ where: { activa: true } }), 
+      
+      prisma.user.count(),
+      
+      prisma.tokens_deuda.count(), 
+      
+      prisma.user.count({ where: { rol_id: ROLES.ADMIN_HOLDING } }),
+      prisma.user.count({ where: { rol_id: ROLES.ADMIN_SUBSIDIARIA } }),
+      prisma.user.count({ where: { rol_id: ROLES.OPERADOR } }),
+      prisma.user.count({ where: { rol_id: ROLES.AUDITOR } })
+    ]);
+
+    const metricas: MetricasSysadminResponse = {
+      totalHoldings,
+      totalSubsidiarias,
+      totalUsuarios,
+      totalContratosBFA,
+      crecimiento: [
+        { name: "Holdings", cantidad: totalHoldings },
+        { name: "Subsidiarias", cantidad: totalSubsidiarias },
+      ],
+      distribucionRoles: [
+        { name: "Administradores", value: adminHoldingCount + adminSubCount },
+        { name: "Operadores", value: operadorCount },
+        { name: "Auditores", value: auditorCount },
+      ]
+    };
+
+    res.status(200).json({
+      success: true,
+      data: metricas
+    });
+
+  } catch (error: any) {
+    console.error("[Sysadmin Controller] Error en el cálculo de métricas (Netting/Core):", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor durante el procesamiento analítico de las métricas B2B." 
+    });
+  }
+};

@@ -23,10 +23,16 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (response.ok) {
+          const body = await response.json();
+          
+          if (body.data && body.data.activo === false) {
+            console.warn(`🚨 Acceso denegado (Baja lógica) para: ${user.email}`);
+            return "/?error=AccessDenied"; 
+          }
           return true;
         } else {
           console.warn(`🚨 Intento de acceso denegado para: ${user.email}`);
-          return "/?error=AccesoDenegado"; 
+          return "/?error=AccessDenied"; 
         }
       } catch (error) {
         console.error("🚨 Error en signIn:", error);
@@ -53,6 +59,7 @@ export const authOptions: NextAuthOptions = {
               token.grupo_id = body.data.grupo_id;
               token.empresa_activa = body.data.empresa_activa; 
               token.holding_activo = body.data.holding_activo; 
+              token.activo = body.data.activo;
               console.log("✅ Datos del backend inyectados en JWT");
             }
           }
@@ -70,6 +77,7 @@ export const authOptions: NextAuthOptions = {
         session.user.grupo_id = token.grupo_id as number;
         session.user.empresa_activa = token.empresa_activa as boolean; 
         session.user.holding_activo = token.holding_activo as boolean; 
+        session.user.activo = token.activo as boolean;
       }
       return session;
     }

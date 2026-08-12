@@ -4,11 +4,12 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2 } from "lucide-react";
+import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2, Building2, Network, Users, FileCode2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 interface DashboardMetrics {
   operacionesPendientes: number;
@@ -28,16 +29,188 @@ interface AlertaPendiente {
   fecha_creacion: string;
 }
 
-function DashboardContent() {
-  const { data: session } = useSession();
-  const searchParams = useSearchParams();
-  
+interface SysadminMetrics {
+  totalHoldings: number;
+  totalSubsidiarias: number;
+  totalUsuarios: number;
+  totalContratosBFA: number;
+  crecimiento: { name: string; cantidad: number }[];
+  distribucionRoles: { name: string; value: number }[];
+}
+
+const ROLES = {
+  SYSADMIN: 1,
+  ADMIN_HOLDING: 2,
+  ADMIN_SUBSIDIARIA: 3,
+  OPERADOR: 4,
+  AUDITOR: 5,
+} as const;
+
+const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
+const BAR_COLOR = '#6366f1';
+
+function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: string }) {
+  const [metrics, setMetrics] = useState<SysadminMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    cargarDatosSysadmin();
+  }, []);
+
+  const cargarDatosSysadmin = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${apiUrl}/sysadmin/metrics`, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": email,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setMetrics(data.data);
+      } 
+    } catch (error) {
+      console.error("[Sysadmin Dashboard] Error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading || !metrics) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+          Panel de control
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Métricas globales del ecosistema B2B y estado de la red BFA.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Holdings registrados</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalHoldings}</div>
+            <p className="text-xs text-muted-foreground">Grupos corporativos activos</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Subsidiarias activas</CardTitle>
+            <Network className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalSubsidiarias}</div>
+            <p className="text-xs text-muted-foreground">Unidades de negocio operando</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuarios totales</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalUsuarios}</div>
+            <p className="text-xs text-muted-foreground">Cuentas corporativas en el sistema</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Contratos en BFA</CardTitle>
+            <FileCode2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalContratosBFA}</div>
+            <p className="text-xs text-muted-foreground">Tokens de deuda inalterables</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-bold">Crecimiento del ecosistema</CardTitle>
+          </CardHeader>
+          <CardContent className="h-75">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={metrics.crecimiento} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false} />
+                <RechartsTooltip 
+                  cursor={{ fill: '#f3f4f6' }}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="cantidad" fill={BAR_COLOR} radius={[4, 4, 0, 0]} barSize={50} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-bold">Distribución global de roles</CardTitle>
+          </CardHeader>
+          <CardContent className="h-75">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={metrics.distribucionRoles}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {metrics.distribucionRoles.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function StandardDashboardView({ 
+  apiUrl, 
+  session, 
+  searchParams 
+}: { 
+  apiUrl: string, 
+  session: any, 
+  searchParams: URLSearchParams 
+}) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [alertas, setAlertas] = useState<AlertaPendiente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const isGlobalAdmin = [1, 2, 5].includes(session?.user?.rol_id || 0);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const isGlobalAdmin = [ROLES.ADMIN_HOLDING, ROLES.AUDITOR].includes(session?.user?.rol_id || 0);
 
   const empresaActiva = session?.user?.empresa_activa ?? true;
   const holdingActivo = session?.user?.holding_activo ?? true;
@@ -46,10 +219,8 @@ function DashboardContent() {
   const accesoBloqueado = searchParams.get('error') === 'baja_logica';
 
   useEffect(() => {
-    if (session?.user?.email) {
-      cargarDatosDashboard();
-    }
-  }, [session]);
+    cargarDatosDashboard();
+  }, []);
 
   const cargarDatosDashboard = async () => {
     try {
@@ -95,7 +266,7 @@ function DashboardContent() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+      <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center space-y-4 text-muted-foreground">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <div className="font-medium text-sm tracking-wide">Sincronizando información financiera...</div>
@@ -105,8 +276,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto bg-background min-h-screen space-y-8">
-      
+    <div className="space-y-8">
       {accesoBloqueado && (
         <Card className="border-destructive/50 bg-destructive/10 shadow-none">
           <CardContent className="flex items-center gap-3 p-4 text-destructive text-sm font-medium">
@@ -144,12 +314,6 @@ function DashboardContent() {
               : "Vista consolidada de pasivos inter-company para su unidad de negocio."}
           </p>
         </div>
-        <Button asChild size="lg" className="shadow-sm">
-          <Link href="/cargar-deuda">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva emisión
-          </Link>
-        </Button>
       </div>
 
       <Card className="shadow-sm">
@@ -239,6 +403,37 @@ function DashboardContent() {
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function DashboardContent() {
+  const { data: session, status } = useSession();
+  const searchParams = useSearchParams();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+  if (status === "loading") {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto bg-background min-h-screen">
+      {session?.user?.rol_id === ROLES.SYSADMIN ? (
+        <SysadminDashboardView 
+          apiUrl={apiUrl} 
+          email={session.user.email || ""} 
+        />
+      ) : (
+        <StandardDashboardView 
+          apiUrl={apiUrl} 
+          session={session} 
+          searchParams={searchParams} 
+        />
+      )}
     </div>
   );
 }

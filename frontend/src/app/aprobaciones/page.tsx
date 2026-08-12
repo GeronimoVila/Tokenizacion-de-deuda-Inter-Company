@@ -200,8 +200,15 @@ export default function AprobacionesPage() {
                   
                   <div className="flex-1 space-y-4">
                     <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 font-bold uppercase tracking-widest text-[10px] px-2.5 py-0.5">
-                        Factura Pendiente
+                      <Badge 
+                        variant="outline" 
+                        className={`font-bold uppercase tracking-widest text-[10px] px-2.5 py-0.5 ${
+                          deuda.estado_validacion === 'RECHAZADA' 
+                            ? 'bg-red-50 text-red-700 border-red-200' 
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {deuda.estado_validacion === 'RECHAZADA' ? 'Rechazada' : 'Factura Pendiente'}
                       </Badge>
                       <span className="text-sm font-semibold text-slate-500">ID Op: #{deuda.id}</span>
                     </div>
@@ -233,7 +240,11 @@ export default function AprobacionesPage() {
                   </div>
 
                   <div className="flex flex-col gap-3 min-w-60 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-8">
-                    {deuda.empresa_receptora.id === session?.user?.empresa_id ? (
+                    {deuda.estado_validacion === 'RECHAZADA' ? (
+                      <div className="bg-red-50 text-red-600 text-sm font-semibold px-4 py-3 rounded-md border border-red-200 text-center flex items-center justify-center italic h-12">
+                        Operación Rechazada
+                      </div>
+                    ) : deuda.empresa_receptora.id === session?.user?.empresa_id ? (
                       session?.user?.empresa_activa === false ? (
                         <div className="bg-destructive/10 text-destructive text-sm font-bold px-4 py-3 rounded-md border border-destructive/20 text-center">
                           Subsidiaria Inactiva (Solo lectura)

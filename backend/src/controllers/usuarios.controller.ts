@@ -60,6 +60,7 @@ export const preRegistrarUsuario = async (req: AuthRequest, res: Response): Prom
         rol_id: idRol,
         grupo_id: admin.grupo_id,
         empresa_id: idEmpresa,
+        activo: true
       }
     });
 
@@ -99,5 +100,57 @@ export const obtenerUsuarios = async (req: AuthRequest, res: Response): Promise<
   } catch (error) {
     console.error("[Usuarios Controller - obtenerUsuarios]", error);
     return res.status(500).json({ error: "Error interno al obtener usuarios." });
+  }
+};
+
+export const cambiarEstadoUsuario = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const admin = req.usuario;
+    const idParam = req.params.id;
+    const idString = Array.isArray(idParam) ? idParam[0] : idParam;
+    const targetUserId = parseInt(idString as string);
+
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: "ID de usuario inválido." });
+    }
+
+    if (!admin?.grupo_id) {
+      return res.status(403).json({ error: "Acceso denegado." });
+    }
+
+    if (admin.id === targetUserId) {
+      return res.status(403).json({ error: "No puedes modificar tu propio estado de acceso." });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Usuario no encontrado." });
+    }
+
+    if (admin.rol_id === 3 && targetUser.empresa_id !== admin.empresa_id) {
+      return res.status(403).json({ error: "No tienes permisos sobre usuarios de otra subsidiaria." });
+    }
+
+    if (admin.grupo_id !== targetUser.grupo_id) {
+      return res.status(403).json({ error: "Operación no permitida fuera del grupo empresarial." });
+    }
+
+    const usuarioActualizado = await prisma.user.update({
+      where: { id: targetUserId },
+      data: { activo: !targetUser.activo }
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: `Usuario ${usuarioActualizado.activo ? 'activado' : 'desactivado'} exitosamente.`,
+      data: { id: usuarioActualizado.id, activo: usuarioActualizado.activo }
+    });
+
+  } catch (error) {
+    console.error("[Usuarios Controller - cambiarEstadoUsuario]", error);
+    return res.status(500).json({ error: "Error interno al cambiar el estado del usuario." });
   }
 };
