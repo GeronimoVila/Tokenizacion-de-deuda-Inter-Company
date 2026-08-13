@@ -182,10 +182,10 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
     }
 
     const isLiquidacion = deuda.detalle.includes("Liquidación de Saldo");
-    const deudorOriginalId = deuda.empresa_receptora_id; 
-    const acreedorOriginalId = deuda.empresa_emisora_id; 
+    const deudorOriginalId = deuda.empresa_emisora_id; 
+    const acreedorOriginalId = deuda.empresa_receptora_id; 
     
-    const walletAcreedor = deuda.empresa_emisora.wallet_address;
+    const walletAcreedor = deuda.empresa_receptora.wallet_address;
 
     if (!walletAcreedor) {
       return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada." });

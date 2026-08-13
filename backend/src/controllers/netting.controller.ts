@@ -62,10 +62,11 @@ export const simularNetting = async (req: AuthRequest, res: Response) => {
     const saldosMap = new Map<string, any>();
     
     tokensActivos.forEach(token => {
-      const deudor = token.transaccion.empresa_emisora.nombre;
-      const acreedor = token.transaccion.empresa_receptora.nombre;
-      const deudor_id = token.transaccion.empresa_emisora_id;
-      const acreedor_id = token.transaccion.empresa_receptora_id;
+      const deudor = token.transaccion.empresa_receptora.nombre;
+      const deudor_id = token.transaccion.empresa_receptora_id;
+      const acreedor = token.transaccion.empresa_emisora.nombre;
+      const acreedor_id = token.transaccion.empresa_emisora_id;
+      
       const llave = `${deudor_id}-${acreedor_id}`;
 
       if (!saldosMap.has(llave)) {

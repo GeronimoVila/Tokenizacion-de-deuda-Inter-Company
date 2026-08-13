@@ -18,8 +18,8 @@ export const generarPropuestaNetting = async (grupoId: number) => {
   const tokensMap = new Map<string, any[]>();
 
   tokensActivos.forEach(token => {
-    const deudorId = token.transaccion.empresa_emisora_id;
-    const acreedorId = token.transaccion.empresa_receptora_id;
+    const deudorId = token.transaccion.empresa_receptora_id; 
+    const acreedorId = token.transaccion.empresa_emisora_id; 
     const llave = `${deudorId}-${acreedorId}`;
 
     const saldoActual = balances.get(llave) || new Prisma.Decimal(0);
