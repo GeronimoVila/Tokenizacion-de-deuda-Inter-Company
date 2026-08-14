@@ -4,12 +4,12 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2, Building2, Network, Users, FileCode2 } from "lucide-react";
+import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2, Building2, Network, Users, FileCode2, TrendingUp, Activity, DollarSign, LineChart as LineChartIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, ReferenceLine } from "recharts";
 
 interface DashboardMetrics {
   operacionesPendientes: number;
@@ -18,6 +18,15 @@ interface DashboardMetrics {
     aCobrar: number;
     aPagar: number;
     saldoNeto: number;
+  };
+  holdingData?: {
+    ahorroHistorico: number;
+    oportunidadesNetting: number;
+    operacionesDelMes: number;
+    graficos: {
+      exposicion: { empresa: string; neto: number }[];
+      evolucionAhorro: { mes: string; ahorro: number }[];
+    };
   };
 }
 
@@ -48,6 +57,16 @@ const ROLES = {
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 const BAR_COLOR = '#6366f1';
+
+// Función global de formato monetario
+const formatearDinero = (monto: number) => {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(monto);
+};
 
 function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: string }) {
   const [metrics, setMetrics] = useState<SysadminMetrics | null>(null);
@@ -197,6 +216,163 @@ function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: strin
   );
 }
 
+// Nueva vista exclusiva para el Administrador del Holding
+function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: any }) {
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  const cargarDatos = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${apiUrl}/dashboard/metrics`, {
+        headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setMetrics(data.data);
+      }
+    } catch (error) {
+      console.error("Error al cargar datos del holding:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading || !metrics || !metrics.holdingData) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const hData = metrics.holdingData;
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+          Inteligencia Financiera (Holding)
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Visión macroeconómica, exposición de deuda interna y optimización de capital mediante Netting.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-t-4 border-t-primary shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold">Deuda Neta Consolidada</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black">{formatearDinero(metrics.saldos.aCobrar)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Tokens Activos (Riesgo Vivo)</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-t-4 border-t-emerald-500 shadow-sm bg-emerald-50/30">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold text-emerald-800">Ahorro Histórico</CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-emerald-700">{formatearDinero(hData.ahorroHistorico)}</div>
+            <p className="text-xs text-emerald-600/80 mt-1">Capital optimizado por Netting</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-t-4 border-t-amber-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold">Oportunidades Netting</CardTitle>
+            <Activity className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-amber-600">{formatearDinero(hData.oportunidadesNetting)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Saldos listos para cruzar hoy</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold">Actividad del Grupo</CardTitle>
+            <LineChartIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black">{hData.operacionesDelMes}</div>
+            <p className="text-xs text-muted-foreground mt-1">Transacciones emitidas este mes</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-slate-500" />
+              Exposición Financiera por Subsidiaria
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Derecha: Acreedor Neto / Izquierda: Deudor Neto</p>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hData.graficos.exposicion} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                <XAxis type="number" tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                <YAxis dataKey="empresa" type="category" width={100} tick={{ fontSize: 11, fontWeight: 'bold' }} />
+                <RechartsTooltip 
+                  formatter={(value: any) => [formatearDinero(Number(value) || 0), "Saldo Neto"]}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <ReferenceLine x={0} stroke="#000" />
+                <Bar dataKey="neto" radius={[0, 4, 4, 0]}>
+                  {hData.graficos.exposicion.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.neto > 0 ? '#10b981' : '#ef4444'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-emerald-600" />
+              Historial de Compensaciones (Ahorro)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Volumen de tokens destruidos (Burned) mes a mes.</p>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={hData.graficos.evolucionAhorro} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorAhorro" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <RechartsTooltip 
+                  formatter={(value: any) => [formatearDinero(Number(value) || 0), "Tokens Quemados"]}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Area type="monotone" dataKey="ahorro" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAhorro)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function StandardDashboardView({ 
   apiUrl, 
   session, 
@@ -249,14 +425,6 @@ function StandardDashboardView({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatearDinero = (monto: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 2
-    }).format(monto);
   };
 
   const formatearFecha = (fechaString: string) => {
@@ -426,6 +594,11 @@ function DashboardContent() {
         <SysadminDashboardView 
           apiUrl={apiUrl} 
           email={session.user.email || ""} 
+        />
+      ) : session?.user?.rol_id === ROLES.ADMIN_HOLDING ? (
+        <HoldingDashboardView 
+          apiUrl={apiUrl} 
+          session={session} 
         />
       ) : (
         <StandardDashboardView 
