@@ -262,13 +262,14 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       
       console.log(`🚀 [Web3] Iniciando Emisión (Mint) de Deuda #${deuda.id}...`);
       const montoParaBlockchain = ethers.parseUnits(montoString, 2);
+      const pasaporteDigital = `BFA-TKN-${deuda.id}`;
 
       const tx = await holdingContract.emitirDeuda(
         walletAcreedor, 
         montoParaBlockchain,
         deuda.empresa_emisora.nombre,
         usuario.email,
-        `ID-Transaccion-${deuda.id}`
+        pasaporteDigital 
       );
 
       const receipt = await tx.wait();
@@ -282,7 +283,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
         const nuevoToken = await txPrisma.tokens_deuda.create({
           data: {
             transaccion_id: deuda.id,
-            token_id_blockchain: tx.hash,
+            token_id_blockchain: pasaporteDigital,
             monto_actual: deuda.monto,
             estado_token: 'Activo',
             txhash_mint: tx.hash,

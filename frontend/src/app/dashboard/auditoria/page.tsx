@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { FiltrosAuditoria, TransaccionUnificada, EmpresaBasica } from "@/types/auditoria.types";
-import { Search, Copy, FileText, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Search, Copy, FileText, Loader2, CheckCircle2, XCircle, ShieldCheck, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,7 +91,8 @@ export default function AuditoriaWeb3Page() {
     buscarHistorial();
   };
 
-  const copiarAlPortapapeles = (texto: string) => {
+  const copiarAlPortapapeles = (texto?: string | null) => {
+    if (!texto) return;
     navigator.clipboard.writeText(texto);
   };
 
@@ -268,53 +269,67 @@ export default function AuditoriaWeb3Page() {
                   </h4>
                   
                   { (op.estado_validacion === 'Emitida' || op.estado_validacion === 'Liquidada') && tokenData ? (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                      
                       <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pasaporte Digital (ID)</p>
-                        <p className="text-sm font-mono font-bold text-slate-700 bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-md truncate w-full" >{tokenData.token_id_blockchain}</p>                       
-                        <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.token_id_blockchain)} className="h-8 w-8 text-slate-400 hover:text-primary">
-                            <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">TxHash Emisión (Mint)</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-mono font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1.5 rounded-md truncate w-full" title={tokenData.txhash_mint}>
-                            {tokenData.txhash_mint}
-                          </p>
-                          <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.txhash_mint)} className="h-8 w-8 text-slate-400 hover:text-primary">
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      {tokenData.txhash_burn && (
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            TxHash Quema (Netting)
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <p 
-                              className="text-xs font-mono font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1.5 rounded-md truncate w-full" 
-                              title={tokenData.txhash_burn}
-                            >
-                              {tokenData.txhash_burn}
-                            </p>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => {
-                                if (tokenData.txhash_burn) {
-                                  copiarAlPortapapeles(tokenData.txhash_burn);
-                                }
-                              }} 
-                              className="h-8 w-8 text-slate-400 hover:text-primary"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                            
+                        <h5 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-500"/> Datos del Pagaré Digital
+                        </h5>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Token ID (Pasaporte)</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-mono font-bold text-slate-700 bg-white border border-slate-300 px-2 py-1.5 rounded-md truncate w-full" >
+                                {tokenData.token_id_blockchain}
+                              </p>
+                              <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.token_id_blockchain)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-200">
+                        <h5 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-emerald-500"/> Pruebas Criptográficas (Auditoría)
+                        </h5>
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bloque de Registro</p>
+                            <p className="text-sm font-mono font-bold text-slate-700 bg-white border border-slate-300 px-2 py-1.5 rounded-md inline-block">
+                              {tokenData.block_number || 'Pendiente'}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">TxHash Emisión (Mint)</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-mono font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1.5 rounded-md truncate w-full" title={tokenData.txhash_mint}>
+                                {tokenData.txhash_mint}
+                              </p>
+                              <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.txhash_mint)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {tokenData.txhash_burn && (
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">TxHash Quema (Netting)</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-mono font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1.5 rounded-md truncate w-full" title={tokenData.txhash_burn}>
+                                  {tokenData.txhash_burn}
+                                </p>
+                                <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.txhash_burn)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                     </div>
                   ) : (
                     <div className="text-center py-6">

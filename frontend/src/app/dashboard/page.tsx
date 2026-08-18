@@ -58,7 +58,6 @@ const ROLES = {
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 const BAR_COLOR = '#6366f1';
 
-// Función global de formato monetario
 const formatearDinero = (monto: number) => {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -216,7 +215,6 @@ function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: strin
   );
 }
 
-// Nueva vista exclusiva para el Administrador del Holding
 function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: any }) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
