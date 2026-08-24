@@ -16,6 +16,27 @@ export interface CrearHoldingRequest {
   nombreAdmin: string;
 }
 
+const validarFormatoCuit = (cuit: string): boolean => {
+  const cuitLimpio = cuit.replace(/\D/g, '');
+  if (cuitLimpio.length !== 11) return false;
+
+  const prefijo = parseInt(cuitLimpio.substring(0, 2), 10);
+  const prefijosValidos = [20, 23, 24, 27, 30, 33, 34];
+  if (!prefijosValidos.includes(prefijo)) return false;
+
+  const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let suma = 0;
+  for (let i = 0; i < 10; i++) {
+    suma += parseInt(cuitLimpio.charAt(i), 10) * multiplicadores[i];
+  }
+
+  let digitoVerificador = 11 - (suma % 11);
+  if (digitoVerificador === 11) digitoVerificador = 0;
+  if (digitoVerificador === 10) return false; 
+
+  return digitoVerificador === parseInt(cuitLimpio.charAt(10), 10);
+};
+
 export const registrarNuevoHolding = async (req: Request, res: Response): Promise<void> => {
   try {
     const rawEmailHeader = req.headers['x-user-email'];
@@ -27,6 +48,11 @@ export const registrarNuevoHolding = async (req: Request, res: Response): Promis
 
     if (!nombre || !cuit || !adminEmail || !nombreAdmin) {
       res.status(400).json({ error: "Nombre, CUIT, nombre del admin y correo corporativo son obligatorios." });
+      return;
+    }
+
+    if (!validarFormatoCuit(cuit)) {
+      res.status(400).json({ error: "El CUIT ingresado no es válido." });
       return;
     }
 

@@ -7,7 +7,7 @@ const router = Router();
 
 router.post('/registrar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA]), upload.single('comprobante'), registrarDeuda);
 
-router.post('/:id/aprobar', requerirRol([ROLES.ADMIN_SUBSIDIARIA]), aprobarDeuda);
+router.post('/:id/aprobar', requerirRol([ROLES.ADMIN_SUBSIDIARIA, ROLES.OPERADOR]), aprobarDeuda);
 
 router.post('/:id/rechazar', requerirRol([ROLES.OPERADOR, ROLES.ADMIN_SUBSIDIARIA, ROLES.ADMIN_HOLDING]), rechazarDeuda);
 

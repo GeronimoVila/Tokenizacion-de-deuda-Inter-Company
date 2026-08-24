@@ -25,8 +25,8 @@ interface Empresa {
 
 const empresaSchema = z.object({
   nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  cuit: z.string().regex(/^\d{11}$/, "El CUIT debe contener exactamente 11 números"),
-  wallet_address: z.string().min(10, "La dirección de la wallet Web3 es obligatoria"),
+  cuit: z.string().regex(/^\d{11}$/, "El CUIT debe contener exactamente 11 números sin espacios ni guiones."),
+  wallet_address: z.string().min(10, "La dirección de la wallet Web3 es obligatoria."),
 });
 
 type EmpresaFormData = z.infer<typeof empresaSchema>;

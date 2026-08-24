@@ -254,7 +254,7 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-          Inteligencia Financiera (Holding)
+          Inteligencia financiera (Holding)
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Visión macroeconómica, exposición de deuda interna y optimización de capital mediante Netting.
@@ -264,18 +264,18 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-primary shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold">Deuda Neta Consolidada</CardTitle>
+            <CardTitle className="text-sm font-semibold">Deuda neta consolidada</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">{formatearDinero(metrics.saldos.aCobrar)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Tokens Activos (Riesgo Vivo)</p>
+            <p className="text-xs text-muted-foreground mt-1">Tokens activos (Riesgo Vivo)</p>
           </CardContent>
         </Card>
 
         <Card className="border-t-4 border-t-emerald-500 shadow-sm bg-emerald-50/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-emerald-800">Ahorro Histórico</CardTitle>
+            <CardTitle className="text-sm font-semibold text-emerald-800">Ahorro histórico</CardTitle>
             <TrendingUp className="h-4 w-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
@@ -286,7 +286,7 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
 
         <Card className="border-t-4 border-t-amber-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold">Oportunidades Netting</CardTitle>
+            <CardTitle className="text-sm font-semibold">Oportunidades netting</CardTitle>
             <Activity className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -297,7 +297,7 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
 
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold">Actividad del Grupo</CardTitle>
+            <CardTitle className="text-sm font-semibold">Actividad del grupo</CardTitle>
             <LineChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -312,9 +312,9 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
           <CardHeader>
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-slate-500" />
-              Exposición Financiera por Subsidiaria
+              Exposición financiera por subsidiaria
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Derecha: Acreedor Neto / Izquierda: Deudor Neto</p>
+            <p className="text-xs text-muted-foreground">Derecha: Acreedor neto / Izquierda: Deudor neto</p>
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -341,7 +341,7 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
           <CardHeader>
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-600" />
-              Historial de Compensaciones (Ahorro)
+              Historial de compensaciones (Ahorro)
             </CardTitle>
             <p className="text-xs text-muted-foreground">Volumen de tokens destruidos (Burned) mes a mes.</p>
           </CardHeader>

@@ -154,3 +154,110 @@ export const cambiarEstadoUsuario = async (req: AuthRequest, res: Response): Pro
     return res.status(500).json({ error: "Error interno al cambiar el estado del usuario." });
   }
 };
+
+export const modificarUsuario = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const admin = req.usuario;
+    const idParam = req.params.id;
+    const targetUserId = parseInt(idParam as string);
+
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: "ID de usuario inválido." });
+    }
+
+    if (!admin?.grupo_id) {
+      return res.status(403).json({ error: "Acceso denegado. No perteneces a un Holding." });
+    }
+
+    if (admin.rol_id === 3) {
+      return res.status(403).json({ error: "No tienes permisos de Administrador de Holding para modificar usuarios." });
+    }
+
+    const { nombre, email, empresa_id, rol_id } = req.body;
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Usuario no encontrado." });
+    }
+
+    if (admin.grupo_id !== targetUser.grupo_id) {
+      return res.status(403).json({ error: "Operación no permitida fuera del grupo empresarial." });
+    }
+
+    const dataToUpdate: any = {};
+
+    if (nombre) dataToUpdate.name = nombre;
+
+    if (email) {
+      const emailLower = email.toLowerCase();
+      if (emailLower !== targetUser.email) {
+        const emailExistente = await prisma.user.findUnique({
+          where: { email: emailLower }
+        });
+        if (emailExistente) {
+          return res.status(409).json({ error: "El correo electrónico ya está registrado por otro usuario." });
+        }
+        dataToUpdate.email = emailLower;
+      }
+    }
+
+    let idRol = targetUser.rol_id;
+    if (rol_id) {
+      idRol = parseInt(rol_id);
+      if (idRol <= admin.rol_id && admin.id !== targetUserId) {
+        return res.status(403).json({
+          error: "No tienes permisos para asignar un rol igual o con mayores privilegios que el tuyo."
+        });
+      }
+      dataToUpdate.rol_id = idRol;
+    }
+
+    if (idRol === null || idRol === undefined) {
+      return res.status(500).json({ error: "Inconsistencia de datos: El usuario no posee un rol base asignado en el sistema." });
+    }
+
+    let idEmpresa = targetUser.empresa_id;
+    if (empresa_id !== undefined) {
+      idEmpresa = empresa_id ? parseInt(empresa_id) : null;
+      dataToUpdate.empresa_id = idEmpresa;
+    }
+
+    if (idRol >= 3 && !idEmpresa) {
+      return res.status(400).json({ error: "Para este nivel de acceso, es obligatorio seleccionar una Empresa Subsidiaria." });
+    }
+
+    if (idEmpresa && idEmpresa !== targetUser.empresa_id) {
+      const empresaDB = await prisma.empresas.findFirst({
+        where: { id: idEmpresa, grupo_id: admin.grupo_id }
+      });
+
+      if (!empresaDB) {
+        return res.status(404).json({ error: "La empresa subsidiaria seleccionada no existe o no pertenece a tu grupo empresarial." });
+      }
+    }
+
+    const usuarioActualizado = await prisma.user.update({
+      where: { id: targetUserId },
+      data: dataToUpdate
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Usuario modificado exitosamente.",
+      data: {
+        id: usuarioActualizado.id,
+        name: usuarioActualizado.name,
+        email: usuarioActualizado.email,
+        rol_id: usuarioActualizado.rol_id,
+        empresa_id: usuarioActualizado.empresa_id
+      }
+    });
+
+  } catch (error) {
+    console.error("[Usuarios Controller - modificarUsuario]", error);
+    return res.status(500).json({ error: "Error interno al modificar usuario." });
+  }
+};

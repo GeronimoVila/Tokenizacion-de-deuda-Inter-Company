@@ -12,7 +12,7 @@ datasource db {
 model Grupos_empresariales {
   id             Int        @id @default(autoincrement())
   nombre         String     @db.VarChar
-  cuit           String     @db.VarChar
+  cuit           String     @unique @db.VarChar
   fecha_creacion DateTime   @default(now()) @db.Timestamp()
   activo         Boolean    @default(true)
   

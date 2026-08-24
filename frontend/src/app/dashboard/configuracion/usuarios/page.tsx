@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Users, ShieldAlert, Building2, Search, FilterX, UserX, UserCheck } from "lucide-react";
+import { Loader2, Plus, Users, ShieldAlert, Building2, Search, FilterX, UserX, UserCheck, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ interface Usuario {
   name: string;
   email: string;
   activo: boolean;
+  rol_id?: number;
+  empresa_id?: number | null;
   rol: { nombre: string };
   empresa?: { nombre: string } | null;
 }
@@ -47,6 +49,9 @@ export default function GestionUsuariosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modoModal, setModoModal] = useState<"crear" | "editar">("crear");
+  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEmail, setFiltroEmail] = useState("");
   const [filtroRol, setFiltroRol] = useState("TODOS");
@@ -110,8 +115,14 @@ export default function GestionUsuariosPage() {
         empresa_id: data.empresa_id ? parseInt(data.empresa_id) : null,
       };
 
-      const res = await fetch(`${apiUrl}/usuarios`, {
-        method: "POST",
+      const endpoint = modoModal === "editar" && usuarioEditando
+        ? `${apiUrl}/usuarios/${usuarioEditando.id}`
+        : `${apiUrl}/usuarios`;
+        
+      const method = modoModal === "editar" ? "PATCH" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
@@ -124,7 +135,7 @@ export default function GestionUsuariosPage() {
         alert(`Error: ${errorData.error}`);
       }
     } catch (error) {
-      console.error("Error al invitar usuario:", error);
+      console.error("Error al procesar usuario:", error);
     }
   };
 
@@ -149,8 +160,22 @@ export default function GestionUsuariosPage() {
     }
   };
 
-  const abrirModal = () => {
+  const abrirModalCreacion = () => {
+    setModoModal("crear");
+    setUsuarioEditando(null);
     reset({ nombre: "", email: "", rol_id: "", empresa_id: "" });
+    setIsModalOpen(true);
+  };
+
+  const abrirModalEdicion = (usuario: Usuario) => {
+    setModoModal("editar");
+    setUsuarioEditando(usuario);
+    reset({
+      nombre: usuario.name,
+      email: usuario.email,
+      rol_id: usuario.rol_id ? usuario.rol_id.toString() : "",
+      empresa_id: usuario.empresa_id ? usuario.empresa_id.toString() : "",
+    });
     setIsModalOpen(true);
   };
 
@@ -222,7 +247,7 @@ export default function GestionUsuariosPage() {
               : "Administra el equipo operativo de tu propia subsidiaria."}
           </p>
         </div>
-        <Button onClick={abrirModal} className="font-bold shadow-sm">
+        <Button onClick={abrirModalCreacion} className="font-bold shadow-sm">
           <Plus className="w-4 h-4 mr-2" /> Invitar usuario
         </Button>
       </div>
@@ -351,7 +376,17 @@ export default function GestionUsuariosPage() {
                       {user.activo ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right flex justify-end gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => abrirModalEdicion(user)}
+                      disabled={session?.user?.email === user.email}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      title={session?.user?.email === user.email ? "No puedes editar tus propios permisos" : "Modificar usuario"}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -385,9 +420,13 @@ export default function GestionUsuariosPage() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-137.5 p-6 border-t-4 border-t-primary">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-xl font-bold text-slate-900">Invitar Nuevo Empleado</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-slate-900">
+              {modoModal === "crear" ? "Invitar Nuevo Empleado" : "Modificar Accesos del Empleado"}
+            </DialogTitle>
             <DialogDescription className="text-sm text-slate-500 pt-1">
-              Complete los datos del empleado para otorgarle acceso seguro al sistema corporativo.
+              {modoModal === "crear" 
+                ? "Complete los datos del empleado para otorgarle acceso seguro al sistema corporativo." 
+                : "Actualice el rol o la subsidiaria para modificar los privilegios de este usuario dentro de la plataforma."}
             </DialogDescription>
           </DialogHeader>
 
@@ -484,9 +523,9 @@ export default function GestionUsuariosPage() {
                 className="font-bold shadow-sm"
               >
                 {isSubmitting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Registrando...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
                 ) : (
-                  "Registrar acceso"
+                  modoModal === "crear" ? "Registrar acceso" : "Guardar cambios"
                 )}
               </Button>
             </div>

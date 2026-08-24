@@ -90,6 +90,31 @@ export const listarTodasLasEmpresas = async (req: AuthRequest, res: Response): P
   }
 };
 
+export const validarFormatoCuit = (cuit: string): boolean => {
+  const cuitLimpio = cuit.replace(/\D/g, '');
+  if (cuitLimpio.length !== 11) return false;
+
+  const prefijo = parseInt(cuitLimpio.substring(0, 2), 10);
+  const prefijosValidos = [20, 23, 24, 27, 30, 33, 34];
+  if (!prefijosValidos.includes(prefijo)) return false;
+
+  const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let suma = 0;
+  for (let i = 0; i < 10; i++) {
+    suma += parseInt(cuitLimpio.charAt(i), 10) * multiplicadores[i];
+  }
+
+  let digitoVerificador = 11 - (suma % 11);
+  if (digitoVerificador === 11) digitoVerificador = 0;
+  if (digitoVerificador === 10) return false; 
+
+  return digitoVerificador === parseInt(cuitLimpio.charAt(10), 10);
+};
+
+export const validarWalletEVM = (wallet: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(wallet);
+};
+
 export const crearEmpresa = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const usuario = req.usuario;
@@ -102,6 +127,16 @@ export const crearEmpresa = async (req: AuthRequest, res: Response): Promise<voi
 
     if (!nombre || !cuit || !wallet_address) {
       res.status(400).json({ error: "Los campos nombre, cuit y wallet_address son obligatorios." });
+      return;
+    }
+
+    if (!validarFormatoCuit(cuit)) {
+      res.status(400).json({ error: "El CUIT de la subsidiaria ingresado no es válido." });
+      return;
+    }
+
+    if (!validarWalletEVM(wallet_address)) {
+      res.status(400).json({ error: "La wallet no es una dirección válida para la Blockchain." });
       return;
     }
 

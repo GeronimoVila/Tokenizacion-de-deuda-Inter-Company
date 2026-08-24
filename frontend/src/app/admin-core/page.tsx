@@ -179,7 +179,7 @@ export default function AdminCorePage() {
         {error && (
           <Alert variant="destructive" className="shadow-sm">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="font-bold">Error de Infraestructura</AlertTitle>
+            <AlertTitle className="font-bold">Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
