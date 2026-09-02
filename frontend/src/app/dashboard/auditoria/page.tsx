@@ -282,7 +282,7 @@ export default function AuditoriaWeb3Page() {
                               <p className="text-sm font-mono font-bold text-slate-700 bg-white border border-slate-300 px-2 py-1.5 rounded-md truncate w-full" >
                                 {tokenData.token_id_blockchain}
                               </p>
-                              <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.token_id_blockchain)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
+                              <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.token_id_blockchain)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0" title="Copiar Token ID">
                                 <Copy className="w-4 h-4" />
                               </Button>
                             </div>
@@ -308,9 +308,15 @@ export default function AuditoriaWeb3Page() {
                               <p className="text-xs font-mono font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1.5 rounded-md truncate w-full" title={tokenData.txhash_mint}>
                                 {tokenData.txhash_mint}
                               </p>
-                              <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.txhash_mint)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
-                                <Copy className="w-4 h-4" />
-                              </Button>
+                              <a 
+                                href={`https://sepolia.etherscan.io/tx/${tokenData.txhash_mint}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="inline-flex items-center justify-center h-8 w-8 text-emerald-600 hover:text-emerald-800 shrink-0 rounded-md hover:bg-emerald-100 transition-colors"
+                                title="Ver en explorador de bloques (Sepolia)"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
                             </div>
                           </div>
 
@@ -321,9 +327,15 @@ export default function AuditoriaWeb3Page() {
                                 <p className="text-xs font-mono font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1.5 rounded-md truncate w-full" title={tokenData.txhash_burn}>
                                   {tokenData.txhash_burn}
                                 </p>
-                                <Button variant="ghost" size="icon" onClick={() => copiarAlPortapapeles(tokenData.txhash_burn)} className="h-8 w-8 text-slate-400 hover:text-primary shrink-0">
-                                  <Copy className="w-4 h-4" />
-                                </Button>
+                                <a 
+                                  href={`https://sepolia.etherscan.io/tx/${tokenData.txhash_burn}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center justify-center h-8 w-8 text-slate-500 hover:text-slate-800 shrink-0 rounded-md hover:bg-slate-200 transition-colors"
+                                  title="Ver en explorador de bloques (Sepolia)"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
                               </div>
                             </div>
                           )}

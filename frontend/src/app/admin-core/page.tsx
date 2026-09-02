@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Building, ShieldAlert, CheckCircle2, AlertCircle, Loader2, Power, PowerOff, Network } from "lucide-react";
+import { Building, ShieldAlert, CheckCircle2, AlertCircle, Loader2, Power, PowerOff, Network, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,7 @@ export default function AdminCorePage() {
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [holdingEnConfirmacion, setHoldingEnConfirmacion] = useState<Holding | null>(null);
 
   const backendUrl = "http://localhost:4000/api/sysadmin/holding";
 
@@ -131,9 +132,6 @@ export default function AdminCorePage() {
 
   const toggleHoldingStatus = async (id: number, currentStatus: boolean) => {
     const accion = currentStatus ? "desactivar" : "activar";
-    if (!confirm(`¿Estás seguro de que deseas ${accion} este grupo empresarial? Esto limitará a todas sus subsidiarias a modo lectura/auditoría.`)) {
-      return;
-    }
 
     try {
       setError(null);
@@ -155,15 +153,17 @@ export default function AdminCorePage() {
       }
 
       setSuccessMsg(`Holding ${accion}do correctamente.`);
+      setHoldingEnConfirmacion(null);
       fetchHoldings();
     } catch (err: any) {
       console.error("Error al cambiar estado:", err);
       setError(err.message);
+      setHoldingEnConfirmacion(null);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans">
+    <div className="max-w-7xl mx-auto p-6 md:p-8 bg-background min-h-screen font-sans relative">
       
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
@@ -339,7 +339,7 @@ export default function AdminCorePage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => toggleHoldingStatus(holding.id, holding.activo)}
+                        onClick={() => setHoldingEnConfirmacion(holding)}
                         className={`font-semibold ${holding.activo ? 'text-rose-600 hover:text-rose-900 hover:bg-rose-50' : 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-50'}`}
                       >
                         {holding.activo ? (
@@ -356,6 +356,53 @@ export default function AdminCorePage() {
           </Table>
         </CardContent>
       </Card>
+
+      {holdingEnConfirmacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-md shadow-2xl border border-border bg-background overflow-hidden">
+            <CardHeader className="bg-amber-500/10 border-b border-amber-500/20 p-6 flex flex-row items-center gap-4 space-y-0">
+              <div className="p-3 bg-amber-500/20 rounded-full text-amber-600 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold text-foreground">
+                  Confirmación de Seguridad
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  Modificación de estado corporativo crítico
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                ¿Estás seguro de que deseas{" "}
+                <span className="font-bold text-foreground underline">
+                  {holdingEnConfirmacion.activo ? "desactivar" : "activar"}
+                </span>{" "}
+                el grupo empresarial <span className="font-bold text-foreground">{holdingEnConfirmacion.nombre}</span>? Esto limitará a todas sus subsidiarias a modo lectura/auditoría.
+              </p>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setHoldingEnConfirmacion(null)}
+                  className="font-semibold"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant={holdingEnConfirmacion.activo ? "destructive" : "default"}
+                  onClick={() => toggleHoldingStatus(holdingEnConfirmacion.id, holdingEnConfirmacion.activo)}
+                  className="font-bold shadow-sm"
+                >
+                  Aceptar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }

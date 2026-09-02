@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowRightLeft, Flame, CheckCircle2, AlertCircle, Loader2, Building2, Scale } from "lucide-react";
+import { ArrowRightLeft, Flame, CheckCircle2, AlertCircle, Loader2, Building2, Scale, ShieldAlert, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface EmpresaInfo {
   id: number;
@@ -25,7 +26,7 @@ interface OportunidadCompensacion {
   empresaB: EmpresaInfo;
   deudaBruta_A_hacia_B: number; 
   deudaBruta_B_hacia_A: number; 
-  montoACompensar: number;      
+  montoACompensar: number;       
   saldoNetoFinal_A_hacia_B: number; 
   saldoNetoFinal_B_hacia_A: number; 
   deudasA_B: DeudaOriginal[];
@@ -46,6 +47,12 @@ export default function NettingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [procesando, setProcesando] = useState<number | null>(null);
   const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito"; texto: string } | null>(null);
+  const [modalNetting, setModalNetting] = useState<{
+    isOpen: boolean;
+    oportunidad: OportunidadCompensacion | null;
+    index: number | null;
+  }>({ isOpen: false, oportunidad: null, index: null });
+
   const esAdministrador = session?.user?.rol_id === 1 || session?.user?.rol_id === 2;
 
   useEffect(() => {
@@ -75,13 +82,12 @@ export default function NettingPage() {
     }
   };
 
-  const handleEjecutarCompensacion = async (oportunidad: OportunidadCompensacion, index: number) => {
-    const confirmacion = confirm(
-      `¿Confirma la compensación (quema en blockchain) por $${oportunidad.montoACompensar} entre ${oportunidad.empresaA.nombre} y ${oportunidad.empresaB.nombre}? Esta acción es irreversible.`
-    );
-    
-    if (!confirmacion) return;
+  const confirmarEjecutarCompensacion = async () => {
+    const oportunidad = modalNetting.oportunidad;
+    const index = modalNetting.index;
+    if (!oportunidad || index === null) return;
 
+    setModalNetting({ isOpen: false, oportunidad: null, index: null });
     setProcesando(index);
     setMensaje(null);
 
@@ -253,7 +259,7 @@ export default function NettingPage() {
                 <div className="p-4 bg-white border-t border-slate-100 flex justify-end">
                   {esAdministrador ? (
                     <Button
-                      onClick={() => handleEjecutarCompensacion(op, index)}
+                      onClick={() => setModalNetting({ isOpen: true, oportunidad: op, index })}
                       disabled={procesando !== null}
                       size="lg"
                       className="font-bold shadow-sm"
@@ -323,6 +329,47 @@ export default function NettingPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog 
+        open={modalNetting.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setModalNetting({ isOpen: false, oportunidad: null, index: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-t-4 border-t-primary p-6">
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 bg-primary/10 text-primary rounded-full">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900">Confirmación de Netting Web3</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-slate-600 pt-1">
+              ¿Confirma la compensación (quema en blockchain) por{" "}
+              <span className="font-bold text-slate-900">
+                {modalNetting.oportunidad ? formatearDinero(modalNetting.oportunidad.montoACompensar) : ""}
+              </span>{" "}
+              entre <span className="font-bold text-slate-900">{modalNetting.oportunidad?.empresaA.nombre}</span> y <span className="font-bold text-slate-900">{modalNetting.oportunidad?.empresaB.nombre}</span>? Esta acción destruirá los tokens en la BFA y es irreversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalNetting({ isOpen: false, oportunidad: null, index: null })}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm"
+              onClick={confirmarEjecutarCompensacion}
+            >
+              Sí, Confirmar y Ejecutar Netting
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

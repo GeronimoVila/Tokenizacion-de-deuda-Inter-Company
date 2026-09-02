@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { AlertCircle, CheckCircle2, Loader2, FileText, Landmark, Wallet, ArrowRightLeft, AlertTriangle, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, FileText, Landmark, Wallet, ArrowRightLeft, AlertTriangle, Lock, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +60,7 @@ export default function LiquidarDeudaPage() {
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [modalRechazo, setModalRechazo] = useState<{ isOpen: boolean; liquidacionId: number | null }>({ isOpen: false, liquidacionId: null });
   const [motivoRechazo, setMotivoRechazo] = useState("");
+  const [modalValidacionCobro, setModalValidacionCobro] = useState<{ isOpen: boolean; liquidacion: TransaccionDeuda | null }>({ isOpen: false, liquidacion: null });
 
   const miEmpresaId = session?.user?.empresa_id;
 
@@ -156,16 +157,18 @@ export default function LiquidarDeudaPage() {
     }
   };
 
-  const handleAprobarCobro = async (id: number) => {
-    if (!confirm("¿El dinero ingresó a tu cuenta bancaria? Esto quemará los tokens remanentes de manera irreversible en la BFA.")) return;
-    
-    setProcesandoId(id);
+  const confirmarValidacionCobro = async () => {
+    const liq = modalValidacionCobro.liquidacion;
+    if (!liq) return;
+
+    setModalValidacionCobro({ isOpen: false, liquidacion: null });
+    setProcesandoId(liq.id);
     setTipoAccion("aprobar");
     setMensaje(null);
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const res = await fetch(`${apiUrl}/deudas/${id}/aprobar`, {
+      const res = await fetch(`${apiUrl}/deudas/${liq.id}/aprobar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" },
       });
@@ -406,7 +409,7 @@ export default function LiquidarDeudaPage() {
                               Rechazar
                             </Button>
                             <Button 
-                              onClick={() => handleAprobarCobro(liq.id)} 
+                              onClick={() => setModalValidacionCobro({ isOpen: true, liquidacion: liq })} 
                               disabled={hayProcesamientoActivo} 
                               className="flex-1 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
                             >
@@ -518,6 +521,46 @@ export default function LiquidarDeudaPage() {
               </DialogFooter>
             </form>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={modalValidacionCobro.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setModalValidacionCobro({ isOpen: false, liquidacion: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-t-4 border-t-emerald-600 p-6">
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-full">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900">Confirmación de Liquidación Web3</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-slate-600 pt-1">
+              ¿El dinero ingresó a tu cuenta bancaria? Al validar este cobro por un monto de{" "}
+              <span className="font-bold text-slate-900">
+                {modalValidacionCobro.liquidacion ? formatearDinero(modalValidacionCobro.liquidacion.monto) : ""}
+              </span>, se quemarán los tokens remanentes de manera irreversible en la Blockchain Federal Argentina (BFA).
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalValidacionCobro({ isOpen: false, liquidacion: null })}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+              onClick={confirmarValidacionCobro}
+            >
+              Sí, Validar y Quemar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -182,10 +182,20 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
     }
 
     const isLiquidacion = deuda.detalle.includes("Liquidación de Saldo");
-    const deudorOriginalId = deuda.empresa_emisora_id; 
-    const acreedorOriginalId = deuda.empresa_receptora_id; 
     
-    const walletAcreedor = deuda.empresa_receptora.wallet_address;
+    let acreedorId: number;
+    let deudorId: number;
+    let walletAcreedor: string;
+
+    if (isLiquidacion) {
+      deudorId = deuda.empresa_emisora_id;
+      acreedorId = deuda.empresa_receptora_id;
+      walletAcreedor = deuda.empresa_receptora.wallet_address;
+    } else {
+      acreedorId = deuda.empresa_emisora_id;
+      deudorId = deuda.empresa_receptora_id;
+      walletAcreedor = deuda.empresa_emisora.wallet_address;
+    }
 
     if (!walletAcreedor) {
       return res.status(400).json({ error: "La empresa acreedora no tiene una Wallet configurada." });
@@ -206,6 +216,7 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
       console.log(`⏳ [Web3] Transacción de quema validada y sellada. TxHash: ${receipt.hash}`);
 
       const resultadoDB = await prisma.$transaction(async (txPrisma) => {
+        // 1. Actualizamos el estado de la transacción de liquidación
         const deudaActualizada = await txPrisma.transacciones_deuda.update({
           where: { id: deuda.id },
           data: { 
@@ -214,13 +225,20 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
           }
         });
 
+        const compensacionDB = await txPrisma.compensaciones.create({
+          data: {
+            usuario_ejecutor_id: usuario.id,
+            descripcion: `Liquidación manual (Transferencia Bancaria). Ref OP: #${deuda.id}`,
+          }
+        });
+
         const tokensActivos = await txPrisma.tokens_deuda.findMany({
           where: {
             estado_token: 'Activo',
             monto_actual: { gt: 0 },
             transaccion: {
-              empresa_emisora_id: acreedorOriginalId,
-              empresa_receptora_id: deudorOriginalId
+              empresa_emisora_id: acreedorId,
+              empresa_receptora_id: deudorId
             }
           },
           orderBy: { id: 'asc' }
@@ -245,8 +263,28 @@ export const aprobarDeuda = async (req: AuthRequest, res: Response): Promise<any
             }
           });
 
+          await txPrisma.compensacion_Detalle.create({
+            data: {
+              compensacion_id: compensacionDB.id,
+              token_id: token.id,
+              monto_compensado: aDescontar
+            }
+          });
+
           restante = restante.minus(aDescontar);
         }
+
+        await txPrisma.tokens_deuda.create({
+          data: {
+            transaccion_id: deuda.id,
+            token_id_blockchain: `BFA-BURN-${deuda.id}`,
+            monto_actual: 0,
+            estado_token: 'Liquidacion_Comprobante',
+            txhash_mint: receipt.hash, 
+            txhash_burn: receipt.hash,
+            block_number: receipt.blockNumber
+          }
+        });
 
         return deudaActualizada;
       });

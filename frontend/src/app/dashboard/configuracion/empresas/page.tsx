@@ -1,12 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Building2, Edit, Power, PowerOff, Wallet } from "lucide-react";
+import { Loader2, Plus, Building2, Edit, Power, PowerOff, Wallet, ShieldAlert, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,10 @@ export default function ConfiguracionEmpresasPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [empresaEditando, setEmpresaEditando] = useState<Empresa | null>(null);
+  const [modalConfirmacionEstado, setModalConfirmacionEstado] = useState<{
+    isOpen: boolean;
+    empresa: Empresa | null;
+  }>({ isOpen: false, empresa: null });
 
   const {
     register,
@@ -111,12 +115,15 @@ export default function ConfiguracionEmpresasPage() {
     }
   };
 
-  const alternarEstadoEmpresa = async (id: number, estaActiva: boolean) => {
-    if (!confirm(`¿Estás seguro de que deseas ${estaActiva ? 'desactivar' : 'reactivar'} esta empresa? Las operaciones históricas se mantendrán intactas.`)) return;
+  const confirmarAlternarEstado = async () => {
+    const empresa = modalConfirmacionEstado.empresa;
+    if (!empresa) return;
+
+    setModalConfirmacionEstado({ isOpen: false, empresa: null });
 
     try {
-      const endpoint = estaActiva ? "desactivar" : "activar";
-      const res = await fetch(`${apiUrl}/empresas/${id}/${endpoint}`, {
+      const endpoint = empresa.activa ? "desactivar" : "activar";
+      const res = await fetch(`${apiUrl}/empresas/${empresa.id}/${endpoint}`, {
         method: "PATCH",
         headers: getHeaders(),
       });
@@ -216,7 +223,7 @@ export default function ConfiguracionEmpresasPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => alternarEstadoEmpresa(empresa.id, empresa.activa)}
+                        onClick={() => setModalConfirmacionEstado({ isOpen: true, empresa })}
                         className={`font-semibold ${empresa.activa ? 'text-rose-600 hover:text-rose-900 hover:bg-rose-50' : 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-50'}`}
                       >
                         {empresa.activa ? (
@@ -322,6 +329,49 @@ export default function ConfiguracionEmpresasPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog 
+        open={modalConfirmacionEstado.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setModalConfirmacionEstado({ isOpen: false, empresa: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-t-4 border-t-amber-500 p-6">
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 bg-amber-500/20 text-amber-600 rounded-full">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900">Confirmación de Seguridad</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-slate-600 pt-1">
+              ¿Estás seguro de que deseas{" "}
+              <span className="font-bold text-slate-900 underline">
+                {modalConfirmacionEstado.empresa?.activa ? 'desactivar' : 'reactivar'}
+              </span>{" "}
+              la empresa <span className="font-bold text-slate-900">{modalConfirmacionEstado.empresa?.nombre}</span>? Las operaciones históricas se mantendrán intactas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalConfirmacionEstado({ isOpen: false, empresa: null })}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant={modalConfirmacionEstado.empresa?.activa ? "destructive" : "default"}
+              onClick={confirmarAlternarEstado}
+              className="font-bold shadow-sm"
+            >
+              Aceptar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

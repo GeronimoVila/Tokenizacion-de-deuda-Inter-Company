@@ -11,6 +11,7 @@ import usuariosRoutes from './routes/usuarios.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import auditoriaRoutes from './routes/auditoria.routes.js';
 import configuracionRoutes from './routes/configuracion.routes.js';
+import metricsRoutes from './routes/metrics.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -27,6 +28,7 @@ app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/configuracion', configuracionRoutes);
+app.use('/api/metrics', metricsRoutes);
 
 app.listen(PORT, async () => {
   console.log(`🚀 API REST Node.js/Express corriendo en puerto ${PORT}`);

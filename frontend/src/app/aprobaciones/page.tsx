@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { FileText, CheckCircle2, AlertCircle, Loader2, ShieldAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ export default function AprobacionesPage() {
   const [mensaje, setMensaje] = useState<{ tipo: "error" | "exito", texto: string } | null>(null);
   const [modalRechazo, setModalRechazo] = useState<{ isOpen: boolean; deudaId: number | null }>({ isOpen: false, deudaId: null });
   const [motivoRechazo, setMotivoRechazo] = useState("");
+  const [modalAprobacion, setModalAprobacion] = useState<{ isOpen: boolean; deuda: TransaccionDeuda | null }>({ isOpen: false, deuda: null });
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -67,9 +68,15 @@ export default function AprobacionesPage() {
     }
   };
 
-  const handleAprobar = async (deuda: TransaccionDeuda) => {
-    if (!confirm("¿Estás seguro de aprobar esta deuda? Esto emitirá un Token en la Blockchain y es irreversible.")) return;
-    
+  const abrirModalAprobacion = (deuda: TransaccionDeuda) => {
+    setModalAprobacion({ isOpen: true, deuda });
+  };
+
+  const confirmarAprobacionWeb3 = async () => {
+    const deuda = modalAprobacion.deuda;
+    if (!deuda) return;
+
+    setModalAprobacion({ isOpen: false, deuda: null });
     setProcesandoId(deuda.id);
     setAccionSeleccionada("aprobar");
     setMensaje(null);
@@ -252,7 +259,7 @@ export default function AprobacionesPage() {
                       ) : (
                         <>
                           <Button 
-                            onClick={() => handleAprobar(deuda)}
+                            onClick={() => abrirModalAprobacion(deuda)}
                             disabled={procesandoId === deuda.id}
                             className="w-full font-bold shadow-sm h-12 text-sm bg-blue-600 hover:bg-blue-700 text-white"
                           >
@@ -284,6 +291,46 @@ export default function AprobacionesPage() {
           ))}
         </div>
       )}
+
+      <Dialog 
+        open={modalAprobacion.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setModalAprobacion({ isOpen: false, deuda: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-t-4 border-t-blue-600 p-6">
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900">Confirmación de Emisión Web3</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-slate-600 pt-1">
+              ¿Estás seguro de aprobar esta deuda por un monto de{" "}
+              <span className="font-bold text-slate-900">
+                {modalAprobacion.deuda ? formatearDinero(modalAprobacion.deuda.monto) : ""}
+              </span>? Esto emitirá un token inalterable en la Blockchain Federal Argentina (BFA) y la operación es irreversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalAprobacion({ isOpen: false, deuda: null })}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
+              onClick={confirmarAprobacionWeb3}
+            >
+              Sí, Aprobar y Emitir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog 
         open={modalRechazo.isOpen} 

@@ -6,14 +6,14 @@ import { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Users, ShieldAlert, Building2, Search, FilterX, UserX, UserCheck, Pencil } from "lucide-react";
+import { Loader2, Plus, Users, ShieldAlert, Building2, Search, FilterX, UserX, UserCheck, Pencil, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Usuario {
@@ -51,6 +51,10 @@ export default function GestionUsuariosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modoModal, setModoModal] = useState<"crear" | "editar">("crear");
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [modalConfirmacionEstado, setModalConfirmacionEstado] = useState<{
+    isOpen: boolean;
+    usuario: Usuario | null;
+  }>({ isOpen: false, usuario: null });
 
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEmail, setFiltroEmail] = useState("");
@@ -139,12 +143,14 @@ export default function GestionUsuariosPage() {
     }
   };
 
-  const alternarEstadoUsuario = async (id: number, estadoActual: boolean) => {
-    const accion = estadoActual ? "desactivar" : "activar";
-    if (!confirm(`¿Estás seguro que deseas ${accion} este usuario?`)) return;
+  const confirmarAlternarEstadoUsuario = async () => {
+    const usuario = modalConfirmacionEstado.usuario;
+    if (!usuario) return;
+
+    setModalConfirmacionEstado({ isOpen: false, usuario: null });
 
     try {
-      const res = await fetch(`${apiUrl}/usuarios/${id}/estado`, {
+      const res = await fetch(`${apiUrl}/usuarios/${usuario.id}/estado`, {
         method: "PATCH",
         headers: getHeaders(),
       });
@@ -390,7 +396,7 @@ export default function GestionUsuariosPage() {
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      onClick={() => alternarEstadoUsuario(user.id, user.activo)}
+                      onClick={() => setModalConfirmacionEstado({ isOpen: true, usuario: user })}
                       disabled={session?.user?.email === user.email}
                       className={user.activo ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"}
                       title={session?.user?.email === user.email ? "No puedes modificar tu propio acceso" : (user.activo ? "Desactivar acceso" : "Reactivar acceso")}
@@ -532,6 +538,49 @@ export default function GestionUsuariosPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog 
+        open={modalConfirmacionEstado.isOpen} 
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setModalConfirmacionEstado({ isOpen: false, usuario: null });
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-t-4 border-t-amber-500 p-6">
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 bg-amber-500/20 text-amber-600 rounded-full">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900">Confirmación de Seguridad</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-slate-600 pt-1">
+              ¿Estás seguro de que deseas{" "}
+              <span className="font-bold text-slate-900 underline">
+                {modalConfirmacionEstado.usuario?.activo ? 'desactivar' : 'reactivar'}
+              </span>{" "}
+              el acceso al usuario <span className="font-bold text-slate-900">{modalConfirmacionEstado.usuario?.name}</span> ({modalConfirmacionEstado.usuario?.email})?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setModalConfirmacionEstado({ isOpen: false, usuario: null })}
+              className="font-semibold text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant={modalConfirmacionEstado.usuario?.activo ? "destructive" : "default"}
+              onClick={confirmarAlternarEstadoUsuario}
+              className="font-bold shadow-sm"
+            >
+              Aceptar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

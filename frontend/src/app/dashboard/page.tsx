@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2, Building2, Network, Users, FileCode2, TrendingUp, Activity, DollarSign, LineChart as LineChartIcon } from "lucide-react";
+import { Plus, ShieldAlert, Lock, FileText, Loader2, CheckCircle2, Building2, Network, Users, FileCode2, TrendingUp, Activity, DollarSign, LineChart as LineChartIcon, Flame } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,12 @@ interface SysadminMetrics {
   distribucionRoles: { name: string; value: number }[];
 }
 
+interface SubsidiaryBurnMetric {
+  empresaId: number;
+  nombreEmpresa: string;
+  totalQuemado: string; 
+}
+
 const ROLES = {
   SYSADMIN: 1,
   ADMIN_HOLDING: 2,
@@ -69,6 +75,7 @@ const formatearDinero = (monto: number) => {
 
 function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: string }) {
   const [metrics, setMetrics] = useState<SysadminMetrics | null>(null);
+  const [totalQuemadoSistema, setTotalQuemadoSistema] = useState<string>("0");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -78,17 +85,25 @@ function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: strin
   const cargarDatosSysadmin = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`${apiUrl}/sysadmin/metrics`, {
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-email": email,
-        },
-      });
+      const headers = {
+        "Content-Type": "application/json",
+        "x-user-email": email,
+      };
 
-      if (res.ok) {
-        const data = await res.json();
+      const [resSysadmin, resBurn] = await Promise.all([
+        fetch(`${apiUrl}/sysadmin/metrics`, { headers }),
+        fetch(`${apiUrl}/metrics/system-burn`, { headers })
+      ]);
+
+      if (resSysadmin.ok) {
+        const data = await resSysadmin.json();
         if (data.success) setMetrics(data.data);
       } 
+      
+      if (resBurn.ok) {
+        const dataBurn = await resBurn.json();
+        if (dataBurn.data) setTotalQuemadoSistema(dataBurn.data.totalSistema);
+      }
     } catch (error) {
       console.error("[Sysadmin Dashboard] Error:", error);
     } finally {
@@ -149,14 +164,16 @@ function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: strin
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-orange-500 shadow-sm bg-orange-50/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contratos en BFA</CardTitle>
-            <FileCode2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-orange-800">Tokens Quemados</CardTitle>
+            <Flame className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalContratosBFA}</div>
-            <p className="text-xs text-muted-foreground">Tokens de deuda inalterables</p>
+            <div className="text-2xl font-black text-orange-700">
+              {formatearDinero(Number(totalQuemadoSistema) || 0)}
+            </div>
+            <p className="text-xs text-orange-600/80 mt-1">Capital global optimizado por compensación</p>
           </CardContent>
         </Card>
       </div>
@@ -217,6 +234,7 @@ function SysadminDashboardView({ apiUrl, email }: { apiUrl: string, email: strin
 
 function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: any }) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [burnMetrics, setBurnMetrics] = useState<SubsidiaryBurnMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -226,12 +244,24 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
   const cargarDatos = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`${apiUrl}/dashboard/metrics`, {
-        headers: { "Content-Type": "application/json", "x-user-email": session?.user?.email || "" }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const headers = { 
+        "Content-Type": "application/json", 
+        "x-user-email": session?.user?.email || "" 
+      };
+
+      const [resDashboard, resBurn] = await Promise.all([
+        fetch(`${apiUrl}/dashboard/metrics`, { headers }),
+        fetch(`${apiUrl}/metrics/holding-burn`, { headers })
+      ]);
+
+      if (resDashboard.ok) {
+        const data = await resDashboard.json();
         if (data.success) setMetrics(data.data);
+      }
+
+      if (resBurn.ok) {
+        const dataBurn = await resBurn.json();
+        if (dataBurn.data) setBurnMetrics(dataBurn.data);
       }
     } catch (error) {
       console.error("Error al cargar datos del holding:", error);
@@ -249,6 +279,10 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
   }
 
   const hData = metrics.holdingData;
+  const chartBurnData = burnMetrics.map(item => ({
+    empresa: item.nombreEmpresa,
+    total: Number(item.totalQuemado)
+  }));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -264,7 +298,7 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-primary shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold">Deuda neta consolidada</CardTitle>
+            <CardTitle className="text-sm font-semibold">Deuda neta actual</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -319,8 +353,8 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={hData.graficos.exposicion} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                <XAxis type="number" tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />                
+                <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis dataKey="empresa" type="category" width={100} tick={{ fontSize: 11, fontWeight: 'bold' }} />
                 <RechartsTooltip 
                   formatter={(value: any) => [formatearDinero(Number(value) || 0), "Saldo Neto"]}
@@ -337,33 +371,33 @@ function HoldingDashboardView({ apiUrl, session }: { apiUrl: string, session: an
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="shadow-sm border-orange-100">
           <CardHeader>
             <CardTitle className="text-base font-bold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-              Historial de compensaciones (Ahorro)
+              <Flame className="w-5 h-5 text-orange-500" />
+              Historial de Quema (Burn) por Subsidiaria
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Volumen de tokens destruidos (Burned) mes a mes.</p>
+            <p className="text-xs text-muted-foreground">Volumen total de activos destruidos en BFA por unidad de negocio.</p>
           </CardHeader>
           <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={hData.graficos.evolucionAhorro} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorAhorro" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false} />
-                <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <RechartsTooltip 
-                  formatter={(value: any) => [formatearDinero(Number(value) || 0), "Tokens Quemados"]}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Area type="monotone" dataKey="ahorro" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAhorro)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {burnMetrics.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartBurnData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="empresa" tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <RechartsTooltip 
+                    formatter={(value: any) => [formatearDinero(Number(value) || 0), "Tokens Quemados"]}
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No hay registros históricos de quema de tokens en el Holding.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
