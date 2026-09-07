@@ -42,8 +42,8 @@ export default function AdminCorePage() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [holdingEnConfirmacion, setHoldingEnConfirmacion] = useState<Holding | null>(null);
-
-  const backendUrl = "http://localhost:4000/api/sysadmin/holding";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const backendUrl = `${apiUrl}/sysadmin/holding`;
 
   const fetchHoldings = async () => {
     try {
