@@ -1,5 +1,5 @@
 import 'dotenv/config'; 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { probarConexionBFA } from './services/blockchain.js';
 import empresasRoutes from './routes/empresas.routes.js';
@@ -16,9 +16,23 @@ import metricsRoutes from './routes/metrics.routes.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors({ origin: 'http://localhost:3000' }));
-app.use(cors({ origin: "https://tokenizaciondeudaintercompany.vercel.app", credentials: true}));
+app.use(cors({ 
+  origin: [
+    'http://localhost:3000', 
+    'https://tokenizaciondeudaintercompany.vercel.app'
+  ], 
+  credentials: true 
+}));
+
 app.use(express.json());
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({
+    estado: "Activo",
+    modulo: "Motor Central MVP Deuda Inter-Company",
+    red_blockchain: "BFA",
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/deudas', deudasRoutes);
